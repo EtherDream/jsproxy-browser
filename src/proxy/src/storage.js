@@ -158,7 +158,7 @@ export function createStorage(global, origin) {
   // Storage API
   //
   function dbOpenHook(oldFn) {
-    return function() {
+    return function(name) {
       if (name) {
         arguments[0] = prefix + name
       }
