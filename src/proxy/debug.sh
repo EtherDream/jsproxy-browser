@@ -1,3 +1,3 @@
-JS=../../dist/x.js
-rm -f $JS.br
-webpack -w -o $JS --mode development
+webpack \
+  --o ../../www/x.js \
+  --mode development
