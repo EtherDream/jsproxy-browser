@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+  <title>Page Sandbox</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0">
+  <base target="_blank">
+  <style>
+    body {
+      padding: 0 0.5em;
+    }
+    .box {
+      margin-top: 1em;
+    }
+    #txtURL {
+      width: 100%;
+      height: 2em;
+      text-indent: 0.5em;
+      padding: 0.25em 0;
+    }
+    #btnGo {
+      width: 100%;
+      font-size: 1.5em;
+    }
+    #list a {
+      margin: 1em;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <input id="txtURL" type="text" value="www.google.com" autofocus>
+  </div>
+  <div class="box">
+    <button id="btnGo" disabled>初始化中...</button>
+  </div>
+  <div class="box">
+    <span>切换线路:</span>
+    <select id="selNode" disabled>
+      <option value="aliyun-hk">轻量云-香港（直连）</option>
+      <option value="aliyun-sg">轻量云-新加坡（直连）</option>
+      <option value="cf-aliyun-hk">轻量云-香港（CF 加速）</option>
+      <option value="cf-aliyun-sg">轻量云-新加坡（CF 加速）</option>
+    </select>
+  </div>
+  <div class="box" id="list">
+  </div>
+  <script>
+    var PAGE_NODE_GET = 100
+    var PAGE_NODE_SWITCH = 102
+    var SW_NODE_SWITCHED = 103
+    var SW_READY = 200
+    var sw = navigator.serviceWorker
+    var swCtl
+
+    function main() {
+      console.log('JsProxy v0.0.1 https://github.com/EtherDream/jsproxy/')
+
+      if (!self.isSecureContext) {
+        txtURL.value = '本程序需要 HTTPS 站点'
+        return
+      }
+      if (!sw || !self.ReadableStream) {
+        txtURL.value = '浏览器版本过低，推荐使用最新版 Chrome 浏览器'
+        return
+      }
+      btnGo.disabled = false
+      btnGo.textContent = 'Go'
+
+      sw.getRegistration().then(function(reg) {
+      if (reg) {
+        onSwReady()
+        sendMsgToSw(PAGE_NODE_GET)
+      } else {
+        sw.register(getRootPath() + 'x.js')
+          .then(onSwReady)
+          .catch(onSwFail)
+        }
+      })
+    }
+
+    function getRootPath() {
+      return location.href.replace(/[^/]+$/, '/')
+    }
+
+    function getNavUrl(text) {
+      if (/^https?:\/\//i.test(text)) {
+        return text
+      }
+      var url
+      if (/\.(com|cn|net|org|tv)$/.test(text)) {
+        url = 'https://' + text
+      } else {
+        url = 'https://www.google.com/search?q=' + encodeURIComponent(text)
+      }
+      return url
+    }
+
+    function encUrl(url) {
+      return getRootPath() + '-----' + url
+    }
+
+    function popup(url) {
+      var a = document.createElement('a')
+      a.rel = 'noopener'
+      a.href = url
+      a.click()
+    }
+
+    btnGo.onclick = function() {
+      var text = txtURL.value.trim()
+      if (text.indexOf('-----') >= 0) {
+        text = text.split('-----').pop()
+        txtURL.value = text
+      }
+      var rawUrl = getNavUrl(text)
+      var navUrl = encUrl(rawUrl)
+      popup(navUrl)
+    }
+    txtURL.onkeypress = function(e) {
+      if (e.keyCode === 13) {
+        btnGo.onclick()
+      }
+    }
+    txtURL.setSelectionRange(0, txtURL.value.length)
+
+
+    function onSwReady() {
+      selNode.disabled = false
+
+      sw.addEventListener('message', function(e) {
+        var data = e.data
+        var cmd = data[0]
+        var msg = data[1]
+        switch (cmd) {
+        case SW_NODE_SWITCHED:
+          selNode
+            .querySelector('*[value=' + msg + ']')
+            .selected = true
+          break
+        case SW_READY:
+          sendMsgToSw(PAGE_NODE_GET)
+          // preload
+          new Image().src = 'https://www.google.com/favicon.ico'
+          break
+        }
+      })
+    }
+
+    function onSwFail(err) {
+      txtURL.value = err
+    }
+
+    selNode.onchange = function() {
+      var item = this.options[this.selectedIndex]
+      sendMsgToSw(PAGE_NODE_SWITCH, item.value)
+    }
+
+    function sendMsgToSw(cmd, val) {
+      var ctl = sw.controller
+      if (!ctl) {
+        console.log('ctl is null')
+        return
+      }
+      ctl.postMessage([cmd, val])
+    }
+
+    var sites = [
+      ['google', ''],
+      ['youtube', ''],
+      ['twitter', 'twitter.com/google'],
+      ['flickr', ''],
+      ['quora', 'www.quora.com/topic/JavaScript-programming-language'],
+      ['twitch', 'www.twitch.tv'],
+      ['reddit', ''],
+      ['wiki', 'zh.wikipedia.org'],
+      ['gist', 'gist.github.com'],
+      ['facebook', 'facebook.com/Google/'],
+      ['blogger', '']
+    ]
+
+    window.onload = function() {
+      list.innerHTML = sites.map(function(arr) {
+        var id = arr[0]
+        var url = arr[1] || ('www.' + id + '.com')
+
+        return '<a rel=noopener href=/-----https://' + url + '>' +
+          '<img width=128 height=128 src=ico/' + id + '.png></a>'
+      }).join('')
+    }
+
+    main()
+  </script>
+</body>
+</html>
