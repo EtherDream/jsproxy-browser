@@ -1,3 +1,3 @@
 webpack \
   --o ../../www/x.js \
-  --mode development
+  --mode development -w
