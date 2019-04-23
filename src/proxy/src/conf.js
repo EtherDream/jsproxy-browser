@@ -1,4 +1,4 @@
-export const JS_VER = '21'
+export const JS_VER = '22'
 
 export const URL_FILE = 'x.js'
 export const URL_DELIM = '-----'

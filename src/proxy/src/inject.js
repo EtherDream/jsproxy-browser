@@ -41,7 +41,6 @@ export function getHtmlCode(urlObj, pageId) {
 <!-- JS PROXY HELPER -->
 <!doctype html>
 <link rel="icon" href="${icoUrl}" type="image/x-icon">
-<meta charset="utf-8">
 <meta http-equiv="content-security-policy" content="frame-src ${CSP}; object-src ${CSP}">
 <base href="${urlObj.href}">
 <script data-id="${pageId}" src="${env.PATH_JS}"></script>
