@@ -81,7 +81,7 @@ export function encUrlStrAbs(url) {
   if (!urlObj) {
     return url
   }
-  return decUrlObj(urlObj)
+  return encUrlObj(urlObj)
 }
 
 
