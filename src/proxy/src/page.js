@@ -388,6 +388,12 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
     },
     onset(val) {
       switch (val.toLowerCase()) {
+      case 'refresh':
+        this.content = this.content.replace(/(;url=)(.+)/i, (_, $1, url) => {
+          console.warn('[jsproxy] meta redir:', url)
+          return $1 + urlx.encUrlStrRel(url, this)
+        })
+        break
       case 'content-security-policy':
         console.warn('[jsproxy] meta csp removed')
         this.remove()
