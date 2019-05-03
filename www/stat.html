@@ -1,0 +1,71 @@
+<!doctypehtml><html lang=cn><head><title>节点状态</title><meta charset=utf-8><link rel=stylesheet href=lib/bootstrap-4.2.1/css/bootstrap.min.css><style></style></head><body><div class="container text-monospace"><div class=row><table id=tbl-data class="table table-striped"><thead><tr><th scope=col style=width:10em>节点</th><th scope=col style=width:6em>状态</th><th scope=col style=width:6em>延迟</th><th scope=col style=width:8em>接收字节/秒</th><th scope=col style=width:8em>发送字节/秒</th><th scope=col style=width:6em>请求/秒</th><th scope=col></th></tr></thead><tbody><tr v-for="item in list"><td>{{ item.node }}</td><td>运行中</td><td>{{ item.delay }}</td><td>{{ item.rx | formatUnit }}</td><td>{{ item.tx | formatUnit }}</td><td>{{ item.rps }}</td><td></td></tr></tbody></table></div></div><script src=lib/vue.js></script><script>const nodeInfo = [
+      {
+        node: '轻量云-香港',
+        url: 'https://node-v2-aliyun-hk.etherdream.com:8443/traff',
+        cfurl: 'https://node-v2-cf-aliyun-hk.etherdream.com:8443/traff',
+      },
+      {
+        node: '轻量云-新加坡',
+        url: 'https://node-v2-aliyun-sg.etherdream.com:8443/traff',
+        cfurl: 'https://node-v2-cf-aliyun-sg.etherdream.com:8443/traff',
+      },
+      {
+        node: '搬瓦工-洛杉矶',
+        url: 'https://node-v2-bwh-los.etherdream.com:8443/traff',
+        cfurl: 'https://node-v2-cf-bwh-los.etherdream.com:8443/traff',
+      }
+    ]
+
+
+    async function launch(info) {
+      const t1 = Date.now()
+      const res = await fetch(info.url)
+      const t2 = Date.now()
+
+      const txt = await res.text()
+
+      const [rx, tx, rps] = txt.split(',')
+      const item = nodeInfoMap[info.node]
+      item.rx = rx
+      item.tx = tx
+      item.rps = rps
+      item.delay = t2 - t1
+    }
+
+    function update() {
+      nodeInfo.forEach(launch)
+    }
+    update()
+    setInterval(update, 2000)
+
+    const V = new Vue({
+      el: '#tbl-data',
+      data: {
+        list: []
+      }
+    })
+
+    const UNIT = ['', 'K', 'M', 'G']
+
+    Vue.filter('formatUnit', v => {
+      let i = 0
+      while (v >= 1024 && i < UNIT.length - 1) {
+        v /= 1024
+        i++
+      }
+      return Math.round(v * 100) / 100 + UNIT[i]
+    })
+
+
+    const nodeInfoMap = {}
+
+    nodeInfo.forEach(info => {
+      const item = {
+        node: info.node,
+        rx: 0,
+        tx: 0,
+        rps: 0,
+      }
+      nodeInfoMap[info.node] = item
+      V.list.push(item)
+    })</script></body></html>

@@ -1,4 +1,4 @@
-export const JS_VER = '22'
+export const JS_VER = '30'
 
 export const URL_FILE = 'x.js'
 export const URL_DELIM = '-----'
@@ -42,6 +42,7 @@ export const DIRECT_HOST = [
   'webmap0.bdimg.com',
   'webmap1.bdimg.com',
   'iknowpc.bdimg.com',
+  'gss0.baidu.com',
 
   // zhihu
   'static.zhihu.com',
@@ -57,6 +58,12 @@ export const DIRECT_HOST = [
   'upload-images.jianshu.io',
   'cdn2.jianshu.io',
 
+  // yd
+  'shared.ydstatic.com',
+
+  // ?
+  'img.zcool.cn',
+
   // uc
   'image.uc.cn',
 
@@ -64,6 +71,23 @@ export const DIRECT_HOST = [
   'csdnimg.cn',
   'g.csdnimg.cn',
   'img-ads.csdn.net',
+
+  // sogou
+  'img03.sogoucdn.com',
+  'img04.sogoucdn.com',
+
+  // wukong
+  'p1.pstatp.com',
+
+  // shimo
+  'images-cdn.shimo.im',
+
+  // img host
+  's1.momo.moda',
+
+  // 
+  'user-gold-cdn.xitu.io',
+  'ob7zbqpa6.qnssl.com',
 
   // ???
   'img-egc.xvideos-cdn.com',
@@ -82,6 +106,8 @@ export const NODE_MAP = {
   'aliyun-sg': 'node-v2-aliyun-sg.etherdream.com:8443',
   'cf-aliyun-hk': 'node-v2-cf-aliyun-hk.etherdream.com:8443',
   'cf-aliyun-sg': 'node-v2-cf-aliyun-sg.etherdream.com:8443',
+  'bwh-los': 'node-v2-bwh-los.etherdream.com:8443',
+  'cf-bwh-los': 'node-v2-cf-bwh-los.etherdream.com:8443',
 }
 
 // 默认节点

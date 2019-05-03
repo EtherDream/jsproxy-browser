@@ -15,15 +15,14 @@ const undefined = void 0
 /**
  * @param {Window} win 
  * @param {string} name 
- * @param {string} origin 
+ * @param {string} prefix 
  */
-function setup(win, name, origin) {
+function setup(win, name, prefix) {
   /** @type {Storage} */
   const raw = win[name]
   if (!raw) {
     return
   }
-  const prefix = origin + ':'
   const prefixLen = prefix.length
 
   const nativeMap = {
@@ -148,11 +147,13 @@ function setup(win, name, origin) {
  * @param {string} origin 
  */
 export function createStorage(global, origin) {
+  const prefix = origin + ':'
+
   //
   // Web Storage
   //
-  setup(global, 'localStorage', origin)
-  setup(global, 'sessionStorage', origin)
+  setup(global, 'localStorage', prefix)
+  setup(global, 'sessionStorage', prefix)
 
   //
   // Storage API

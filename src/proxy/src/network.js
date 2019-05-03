@@ -120,6 +120,8 @@ function initReqHdr(req, urlObj, cliUrlObj) {
   const sysHdr = {
     '--ver': conf.JS_VER,
     '--url': urlx.delHash(urlObj.href),
+    '--mode': req.mode,
+    '--type': req.destination || '',
   }
   const extHdr = {}
   let hasExtHdr = false
@@ -242,7 +244,16 @@ export function genHttpUrl(urlObj) {
   if (!urlx.isHttpProto(urlObj.protocol)) {
     return null
   }
-  return `https://${curHost}/http`
+  // TODO: qos 算法
+  let host = curHost
+
+  // cfworker 测试
+  if (/video/.test(urlObj.hostname) &&
+      !/generate_204/.test(urlObj.pathname)) {
+    // host = conf.NODE_MAP['aliyun-sg']
+    host = 'node-v2-cfworker.etherdream.com'
+  }
+  return `https://${host}/http`
 }
 
 
