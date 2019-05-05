@@ -265,12 +265,6 @@ export function genHttpUrl(urlObj) {
   // TODO: qos 算法
   let host = curHost
 
-  // 临时测试
-  if (/video/.test(urlObj.hostname) &&
-      !/generate_204/.test(urlObj.pathname)
-  ) {
-    host = conf.NODE_MAP['aliyun-sg']
-  }
   return `https://${host}/http`
 }
 
