@@ -69,7 +69,7 @@ function pageNotify(id, isDone) {
 
 function makeErrRes(desc) {
   return new Response(desc, {
-    status: 200
+    status: 502
   })
 }
 
@@ -172,31 +172,30 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
     res, resOpt, cookies
   } = await network.launch(req, urlObj, cliUrlObj)
 
-  const resStatus = resOpt.status
-  const resHdrObj = resOpt.headers
-
   if (cookies) {
     sendMsgToPages(MSG.SW_COOKIE_PUSH, cookies)
   }
 
+  const {status, headers} = resOpt
+
   // 空响应
   // https://fetch.spec.whatwg.org/#statuses
-  if (resStatus === 101 ||
-      resStatus === 204 ||
-      resStatus === 205 ||
-      resStatus === 304
+  if (status === 101 ||
+      status === 204 ||
+      status === 205 ||
+      status === 304
   ) {
     return new Response(null, resOpt)
   }
 
   // 处理重定向
-  if (resStatus === 301 ||
-      resStatus === 302 ||
-      resStatus === 303 ||
-      resStatus === 307 ||
-      resStatus === 308
+  if (status === 301 ||
+      status === 302 ||
+      status === 303 ||
+      status === 307 ||
+      status === 308
   ) {
-    const locStr = resHdrObj['location']
+    const locStr = headers.get('location')
     if (locStr) {
       // 如果重定向到相对路径，则基于请求的 URL（不是页面的 URL）
       const locObj = urlx.newUrl(locStr, urlObj)
@@ -209,7 +208,7 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
           return forward(req, locObj, cliUrlObj, redirNum)
         }
         // 不跟随模式（例如页面跳转），返回 30X 状态
-        resHdrObj['location'] = urlx.encUrlObj(locObj)
+        headers.set('location', urlx.encUrlObj(locObj))
       }
     }
     // firefox, safari 保留内容会提示页面损坏
@@ -221,7 +220,7 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
   // 可能存在多个段，并且值可能包含引号。例如：
   // content-type: text/html; ...; charset="gbk"
   //
-  const ctVal = resHdrObj['content-type'] || ''
+  const ctVal = headers.get('content-type') || ''
   const [, mime, charset] = ctVal
     .toLocaleLowerCase()
     .match(/([^;]*)(?:.*?charset=['"]?([^'"]+))?/)
@@ -235,7 +234,7 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
     const buf = await res.arrayBuffer()
     const ret = processJs(buf, charset)
 
-    resHdrObj['content-type'] = 'text/javascript'
+    headers.set('content-type', 'text/javascript')
     return new Response(ret, resOpt)
   }
 
@@ -259,11 +258,8 @@ async function proxy(e, urlObj) {
   }
   const cliUrlObj = new URL(cliUrlStr)
 
-  // try {
-    return forward(e.request, urlObj, cliUrlObj, 0)
-  // } catch (err) {
-  //   console.warn('[jsproxy] forward err:', err)
-  // }
+  return forward(e.request, urlObj, cliUrlObj, 0)
+    .catch(makeErrRes)
 }
 
 

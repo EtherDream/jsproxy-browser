@@ -41,15 +41,11 @@ function getReqCookie(targetUrlObj, clientTld, req) {
 
 
 /**
- * @param {Object<string, string | string[]>} headers 
+ * @param {string[]} cookieStrArr 
  * @param {URL} urlObj 
  * @param {URL} cliUrlObj
  */
-function procResCookie(headers, urlObj, cliUrlObj) {
-  const x = headers['set-cookie']
-  if (!x) {
-    return
-  }
+function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
   if (!ENABLE_3RD_COOKIE) {
     const urlTld = tld.getTld(urlObj.hostname)
     const cliTld = tld.getTld(cliUrlObj.hostname)
@@ -57,22 +53,22 @@ function procResCookie(headers, urlObj, cliUrlObj) {
       return
     }
   }
-  const arr = Array.isArray(x) ? x : [x]
-  return arr
+  return cookieStrArr
     .map(str => cookie.parse(str, urlObj))
     .filter(item => item && !item.httpOnly)
 }
 
 
 /**
- * @param {Headers} resHdr 
+ * @param {Headers} resHdrRaw 
+ * @param {string[]} cookieStrArr 
  * @return {ResponseInit}
  */
-function getResInfo(resHdr) {
-  const headers = {}
+function getResInfo(resHdrRaw, cookieStrArr) {
+  const headers = new Headers()
   let status = 0
 
-  resHdr.forEach((val, key) => {
+  resHdrRaw.forEach((val, key) => {
     if (key === 'access-control-allow-origin' ||
         key === 'access-control-expose-headers') {
       return
@@ -88,23 +84,41 @@ function getResInfo(resHdr) {
       console.log('[jsproxy] support ACEH *')
       return
     }
-    // 重名字段，转成数组
+    // 还原重名字段
+    //  0-key: v1
+    //  1-key: v2
+    // =>
+    //  key: v1, v2
     const m = key.match(/^\d+-(.+)/)
     if (m) {
-      const k = m[1]
-      const arr = headers[k]
-      if (Array.isArray(arr)) {
-        arr.push(val)
+      key = m[1]
+      if (key === 'set-cookie') {
+        // cookie 单独存储，因为多个 set-cookie 合并后有问题：
+        //  var h = new Headers()
+        //  h.append('set-cookie', 'hello')
+        //  h.append('set-cookie', 'world')
+        //  h.get('set-cookie')  // "hello, world"
+        cookieStrArr.push(val)
       } else {
-        headers[k] = [val]
+        headers.append(key, val)
       }
       return
     }
-    // 转义字段
+
+    // 还原转义字段（`--key` => `key`）
     if (key.startsWith('--')) {
       key = key.substr(2)
     }
-    headers[key] = val
+
+    // 删除 vary 字段的 --url
+    if (key === 'vary') {
+      if (val === '--url') {
+        return
+      }
+      val = val.replace('--url,', '')
+    }
+
+    headers.set(key, val)
   })
 
   return {status, headers}
@@ -224,9 +238,13 @@ export async function launch(req, urlObj, cliUrlObj) {
     // 代理
     reqOpt.headers = initReqHdr(req, urlObj, cliUrlObj)
     res = await fetch(proxyUrl, reqOpt)
-    resOpt = getResInfo(res.headers)
 
-    cookies = procResCookie(resOpt.headers, urlObj, cliUrlObj)
+    const cookieStrArr = []
+    resOpt = getResInfo(res.headers, cookieStrArr)
+
+    if (cookieStrArr.length) {
+      cookies = procResCookie(cookieStrArr, urlObj, cliUrlObj)
+    }
   } while (0)
 
   resOpt = resOpt || {
@@ -247,11 +265,11 @@ export function genHttpUrl(urlObj) {
   // TODO: qos 算法
   let host = curHost
 
-  // cfworker 测试
+  // 临时测试
   if (/video/.test(urlObj.hostname) &&
-      !/generate_204/.test(urlObj.pathname)) {
-    // host = conf.NODE_MAP['aliyun-sg']
-    host = 'node-v2-cfworker.etherdream.com'
+      !/generate_204/.test(urlObj.pathname)
+  ) {
+    host = conf.NODE_MAP['aliyun-sg']
   }
   return `https://${host}/http`
 }
