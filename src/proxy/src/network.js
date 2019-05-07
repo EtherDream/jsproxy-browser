@@ -1,6 +1,5 @@
 import * as conf from './conf.js'
 import * as cookie from './cookie.js'
-import * as util from './util.js'
 import * as urlx from './urlx.js'
 import * as tld from './tld.js'
 
@@ -17,7 +16,7 @@ const REQ_HDR_ALLOW = new Set('accept,accept-charset,accept-encoding,accept-lang
 // 因此请求头中设置 aceh__ 标记，告知服务器是否要返回所有字段名。
 let isAcehOld = true
 
-const whiteSet = new Set(conf.DIRECT_HOST)
+const directHostSet = new Set(conf.DIRECT_HOST)
 
 /**
  * @param {URL} targetUrlObj 
@@ -61,10 +60,11 @@ function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
 
 /**
  * @param {Headers} resHdrRaw 
- * @param {string[]} cookieStrArr 
- * @return {ResponseInit}
  */
-function getResInfo(resHdrRaw, cookieStrArr) {
+function getResInfo(resHdrRaw) {
+  /** @type {string[]} */
+  const cookieStrArr = []
+
   const headers = new Headers()
   let status = 0
 
@@ -78,10 +78,7 @@ function getResInfo(resHdrRaw, cookieStrArr) {
       status = +val
       return
     }
-    // 该字段用于测试浏览器是否支持 aceh: *
     if (key === '--t') {
-      isAcehOld = false
-      console.log('[jsproxy] support ACEH *')
       return
     }
     // 还原重名字段
@@ -89,15 +86,17 @@ function getResInfo(resHdrRaw, cookieStrArr) {
     //  1-key: v2
     // =>
     //  key: v1, v2
+    //
+    // 对于 set-cookie 单独存储，因为合并会破坏 cookie 格式：
+    //  var h = new Headers()
+    //  h.append('set-cookie', 'hello')
+    //  h.append('set-cookie', 'world')
+    //  h.get('set-cookie')  // "hello, world"
+    //
     const m = key.match(/^\d+-(.+)/)
     if (m) {
       key = m[1]
       if (key === 'set-cookie') {
-        // cookie 单独存储，因为多个 set-cookie 合并后有问题：
-        //  var h = new Headers()
-        //  h.append('set-cookie', 'hello')
-        //  h.append('set-cookie', 'world')
-        //  h.get('set-cookie')  // "hello, world"
         cookieStrArr.push(val)
       } else {
         headers.append(key, val)
@@ -121,7 +120,7 @@ function getResInfo(resHdrRaw, cookieStrArr) {
     headers.set(key, val)
   })
 
-  return {status, headers}
+  return {status, headers, cookieStrArr}
 }
 
 
@@ -131,28 +130,29 @@ function getResInfo(resHdrRaw, cookieStrArr) {
  * @param {URL} cliUrlObj 
  */
 function initReqHdr(req, urlObj, cliUrlObj) {
-  const sysHdr = {
+  const sysHdr = new Headers({
     '--ver': conf.JS_VER,
     '--url': urlx.delHash(urlObj.href),
     '--mode': req.mode,
     '--type': req.destination || '',
-  }
+    '--level': '1',
+  })
   const extHdr = {}
   let hasExtHdr = false
 
   req.headers.forEach((val, key) => {
     if (REQ_HDR_ALLOW.has(key)) {
-      sysHdr[key] = val
+      sysHdr.set(key, val)
     } else {
       extHdr[key] = val
       hasExtHdr = true
     }
   })
 
-  if (sysHdr['origin']) {
-    sysHdr['--origin'] = cliUrlObj.origin
+  if (sysHdr.has('origin')) {
+    sysHdr.set('--origin', cliUrlObj.origin)
   } else {
-    sysHdr['--origin'] = ''
+    sysHdr.set('--origin', '')
   }
 
   const referer = req.referrer
@@ -160,25 +160,79 @@ function initReqHdr(req, urlObj, cliUrlObj) {
     // TODO: CSS 引用图片的 referer 不是页面 URL，而是 CSS URL
     if (referer === REFER_ORIGIN) {
       // Referrer Policy: origin
-      sysHdr['--referer'] = cliUrlObj.origin + '/'
+      sysHdr.set('--referer', cliUrlObj.origin + '/')
     } else {
-      sysHdr['--referer'] = urlx.decUrlStrAbs(referer)
+      sysHdr.set('--referer', urlx.decUrlStrAbs(referer))
     }
   }
 
   const cliTld = tld.getTld(cliUrlObj.hostname)
   const cookie = getReqCookie(urlObj, cliTld, req)
   if (cookie) {
-    sysHdr['--cookie'] = cookie
+    sysHdr.set('--cookie', cookie)
   }
 
   if (hasExtHdr) {
-    sysHdr['--ext'] = JSON.stringify(extHdr)
+    sysHdr.set('--ext', JSON.stringify(extHdr))
   }
   if (isAcehOld) {
-    sysHdr['--aceh'] = '1'
+    sysHdr.set('--aceh', '1')
   }
   return sysHdr
+}
+
+/**
+ * 直连的资源
+ * 
+ * @param {URL} urlObj 
+ * @param {Request} req 
+ * @param {RequestInit} reqOpt 
+ */
+async function proxyDirect(urlObj, req, reqOpt) {
+  let hdr = req.headers
+
+  // 从地址栏访问资源，请求头会出现该字段，导致出现 preflight
+  if (hdr.has('upgrade-insecure-requests')) {
+    hdr = new Headers(req.headers)
+    hdr.delete('upgrade-insecure-requests')
+  }
+  reqOpt.headers = hdr
+
+  try {
+    const res = await fetch(urlObj.href, reqOpt)
+    if (res.status === 200) {
+      return res
+    }
+  } catch (err) {
+  }
+  console.warn('[jsproxy] direct proxy fail:', urlObj.href)
+  return null
+}
+
+/**
+ * @param {string} url
+ * @param {*} reqOpt 
+ */
+async function proxyNode2(url, reqOpt) {
+  try {
+    var res = await fetch(url, reqOpt)
+  } catch (err) {
+    return null
+  }
+
+  if (res.status === 400) {
+    const err = await res.text()
+    console.warn('[jsproxy] proxy fail:', err)
+    return null
+  }
+
+  const rawStatus = +res.headers.get('--s')
+  if (rawStatus !== 200 && rawStatus !== 206) {
+    console.warn('[jsproxy] proxy invalid status:', rawStatus)
+    return null
+  }
+
+  return res
 }
 
 
@@ -210,61 +264,102 @@ export async function launch(req, urlObj, cliUrlObj) {
     reqOpt.signal = req.signal
   }
 
-  let res, resOpt, cookies
+  /** @type {Response} */
+  let res
+
+  // 非 HTTP 协议的资源，直接访问
+  // 例如 youtube 引用了 chrome-extension: 协议的脚本
+  if (!urlx.isHttpProto(urlObj.protocol)) {
+    reqOpt.headers = req.headers
+    res = await fetch(req)
+  }
+  // 支持 cors 的资源，直接访问
+  else if (
+    method === 'GET' &&
+    directHostSet.has(urlObj.host)
+  ) {
+    res = await proxyDirect(urlObj, req, reqOpt)
+  }
+
+  if (res) {
+    return {
+      res,
+      status: res.status || 200,
+      headers: new Headers(res.headers),
+      cookies: null
+    }
+  }
+
+  // 走代理，请求参数打包在头部字段
+  const reqHdr = initReqHdr(req, urlObj, cliUrlObj)
+  reqOpt.headers = reqHdr
+
+  let level = 1
+  let proxyUrl = genHttpUrl(urlObj, level)
+  res = await fetch(proxyUrl, reqOpt)
+
+  let resHdr = res.headers
+
+  // 检测浏览器是否支持 aceh: *
+  if (isAcehOld && resHdr.has('--t')) {
+    isAcehOld = false
+    reqHdr.delete('--aceh')
+  }
 
   do {
-    // TODO: 逻辑调整。
-    if (method === 'GET' && whiteSet.has(urlObj.host)) {
-      // 白名单资源直接访问
-      reqOpt.headers = req.headers
-      try {
-        res = await fetch(urlObj, reqOpt)
-        if (res.status === 200) {
-          break
-        }
-      } catch (err) {
-      }
-      console.warn('[jsproxy] direct fetch fail:', urlObj.href)
-    }
-
-    const proxyUrl = genHttpUrl(urlObj)
-    if (!proxyUrl) {
-      // 非 HTTP 类型，比如 chrome-extension:
-      reqOpt.headers = req.headers
-      res = await fetch(urlObj, reqOpt)
+    // 是否切换节点
+    if (!resHdr.has('--switched')) {
       break
     }
 
-    // 代理
-    reqOpt.headers = initReqHdr(req, urlObj, cliUrlObj)
-    res = await fetch(proxyUrl, reqOpt)
+    const rawInfo = resHdr.get('--raw-info')
+    reqHdr.set('--raw-info', rawInfo)
 
-    const cookieStrArr = []
-    resOpt = getResInfo(res.headers, cookieStrArr)
-
-    if (cookieStrArr.length) {
-      cookies = procResCookie(cookieStrArr, urlObj, cliUrlObj)
+    // TODO: 逻辑优化
+    level++
+    reqHdr.set('--level', level + '')
+    proxyUrl = genHttpUrl(urlObj, level)
+    res = await proxyNode2(proxyUrl, reqOpt)
+    if (res) {
+      break
     }
+
+    // 切换失败，使用原节点
+    // TODO: 尝试更多廉价节点，最坏情况才使用原节点
+    reqHdr.set('--level', '0')
+    proxyUrl = genHttpUrl(urlObj, 0)
+    res = await fetch(proxyUrl, reqOpt)
   } while (0)
 
-  resOpt = resOpt || {
-    status: res.status,
-    headers: res.headers,
-  }
-  return {res, resOpt, cookies}
+  const {
+    status, headers, cookieStrArr
+  } = getResInfo(res.headers)
+
+  const cookies = cookieStrArr.length
+    ? procResCookie(cookieStrArr, urlObj, cliUrlObj)
+    : null
+
+  return {res, status, headers, cookies}
 }
 
 
 /**
  * @param {URL} urlObj 
+ * @param {number} level 
  */
-export function genHttpUrl(urlObj) {
-  if (!urlx.isHttpProto(urlObj.protocol)) {
-    return null
-  }
-  // TODO: qos 算法
-  let host = curHost
+export function genHttpUrl(urlObj, level) {
+  let node = curNode
 
+  // 临时测试
+  if (/video/.test(urlObj.hostname)) {
+    node = 'aliyun-sg'
+  }
+
+  if (level === 2) {
+    node = 'cfworker'
+  }
+
+  let host = conf.getNodeHost(node)
   return `https://${host}/http`
 }
 
@@ -289,28 +384,10 @@ export function genWsUrl(urlObj, args) {
   args['url__'] = scheme + '://' + t
   args['ver__'] = conf.JS_VER
 
-  return `wss://${curHost}/ws?` + new URLSearchParams(args)
+  const host = conf.getNodeHost(curNode)
+  return `wss://${host}/ws?` + new URLSearchParams(args)
 }
 
 
 // TODO: 临时测试
-let curNode = conf.NODE_DEF
-let curHost = conf.NODE_MAP[curNode]
-
-/**
- * @param {string} node 
- */
-export function switchNode(node) {
-  const host = conf.NODE_MAP[node]
-  if (!host) {
-    return false
-  }
-  curNode = node
-  curHost = host
-  return true
-}
-
-
-export function getNode() {
-  return curNode
-}
+let curNode = conf.NODE_MAIN

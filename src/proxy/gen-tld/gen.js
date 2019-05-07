@@ -1,5 +1,5 @@
 const str = require('fs')
-  .readFileSync('./.list.dat', 'utf8')
+  .readFileSync('/tmp/list.dat', 'utf8')
   .split('\n')
   .filter(v =>
     v &&

@@ -41,8 +41,8 @@ export function func(obj, key, factory) {
  * 
  * @param {object} obj 
  * @param {string} key 
- * @param {(oldFn: () => any) => Function} g 
- * @param {(oldFn: () => void) => Function} s 
+ * @param {(oldFn: () => any) => Function=} g 
+ * @param {(oldFn: () => void) => Function=} s 
  */
 export function prop(obj, key, g, s) {
   const desc = getOwnPropertyDescriptor(obj, key)
@@ -61,7 +61,7 @@ export function prop(obj, key, g, s) {
 
 
 /**
- * @param {Window} win 
+ * @param {WindowOrWorkerGlobalScope} win 
  */
 export function createDomHook(win) {
   /**
@@ -193,7 +193,7 @@ export function createDomHook(win) {
   }
 
   /**
-   * @param {Text} node
+   * @param {Node} node
    * @param {object} handler
    * @param {Element} elem 
    */
@@ -229,14 +229,18 @@ export function createDomHook(win) {
    * @param {Node} node 
    */
   function addNode(node) {
-    switch (node.nodeType) {
-    case 1:   // ELEMENT_NODE
-      const handlers = tagAttrHandlersMap[node.tagName]
+    const type = node.nodeType
+    if (type === 1) {
+      /** @type {Element} */
+      // @ts-ignore
+      const elem = node
+      const handlers = tagAttrHandlersMap[elem.tagName]
       handlers && handlers.forEach(v => {
-        parseNewElemNode(node, v)
+        parseNewElemNode(elem, v)
       })
-      break
-    case 3:   // TEXT_NODE
+    }
+    else if (type === 3) {
+      // TEXT_NODE
       const parent = node.parentElement
       if (parent) {
         const handler = tagTextHandlerMap[parent.tagName]
@@ -244,7 +248,6 @@ export function createDomHook(win) {
           parseNewTextNode(node, handler, parent)
         }
       }
-      break
     }
   }
 

@@ -1,4 +1,4 @@
-curl -o ./.list.dat https://publicsuffix.org/list/effective_tld_names.dat
+curl -o /tmp/list.dat https://publicsuffix.org/list/effective_tld_names.dat
 
 node gen.js > ../src/tld-data.js
 

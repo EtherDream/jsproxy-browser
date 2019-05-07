@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "checkJs": true,
+    "lib": ["webworker", "dom", "es2017"]
+  },
+  "include": [
+    "src/*"
+  ]
+}

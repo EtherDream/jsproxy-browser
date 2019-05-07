@@ -114,7 +114,6 @@ export function init(win) {
     return
   }
 
-if(win.__location)debugger
 
   const {
     location,
@@ -358,7 +357,6 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   hookProp(msgEventProto, 'origin',
     getter => function() {
       const {ori} = env.get(this)
-      console.log('ori:',ori.origin)
       return ori.origin
     }
   )
@@ -569,6 +567,7 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
     while (el) {
       const tag = el.tagName
       if (tag === 'A' || tag === 'AREA') {
+        // eslint-disable-next-line no-self-assign
         el.href = el.href
         break
       }

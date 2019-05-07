@@ -1,12 +1,8 @@
 import * as urlx from './urlx.js'
-import * as jsfilter from './jsfilter.js'
-import * as inject from './inject.js'
-import * as util from './util.js'
 import * as network from './network.js'
 import * as env from './env.js'
 import {createFakeLoc} from './fakeloc.js'
 import {createStorage} from './storage.js'
-import {lockNative} from './lock-native'
 import {
   prop as hookProp,
   func as hookFunc,

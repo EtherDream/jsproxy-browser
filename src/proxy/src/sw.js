@@ -10,6 +10,12 @@ import * as inject from './inject.js'
 
 const MAX_REDIR = 5
 
+/** @type {ServiceWorkerGlobalScope} */
+// @ts-ignore
+const global = self
+
+const clients = global.clients
+
 
 function sendMsg(target, cmd, val) {
   if (target) {
@@ -69,7 +75,7 @@ function pageNotify(id, isDone) {
 
 function makeErrRes(desc) {
   return new Response(desc, {
-    status: 502
+    status: 500
   })
 }
 
@@ -92,7 +98,7 @@ function processHtml(res, resOpt, urlObj) {
         const pageId = genPageId()
         const buf = inject.getHtmlCode(urlObj, pageId)
         controller.enqueue(buf)
-console.log('new pageId:',pageId)
+
         // 留一些时间给页面做异步初始化
         const done = await pageWait(pageId)
         if (!done) {
@@ -166,17 +172,18 @@ async function getUrlByClientId(id) {
  * @param {URL} urlObj
  * @param {URL} cliUrlObj 
  * @param {number} redirNum
+ * @returns {Promise<Response>}
  */
 async function forward(req, urlObj, cliUrlObj, redirNum) {
   const {
-    res, resOpt, cookies
+    res, status, headers, cookies
   } = await network.launch(req, urlObj, cliUrlObj)
 
   if (cookies) {
     sendMsgToPages(MSG.SW_COOKIE_PUSH, cookies)
   }
 
-  const {status, headers} = resOpt
+  const resOpt = {status, headers}
 
   // 空响应
   // https://fetch.spec.whatwg.org/#statuses
@@ -239,7 +246,7 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
   }
 
   if (req.mode === 'navigate' && mime === 'text/html') {
-    return processHtml(res, resOpt, urlObj, true)
+    return processHtml(res, resOpt, urlObj)
   }
 
   return new Response(res.body, resOpt)
@@ -258,13 +265,16 @@ async function proxy(e, urlObj) {
   }
   const cliUrlObj = new URL(cliUrlStr)
 
-  return forward(e.request, urlObj, cliUrlObj, 0)
-    .catch(makeErrRes)
+  try {
+    return await forward(e.request, urlObj, cliUrlObj, 0)
+  } catch (err) {
+    console.error(err)
+    return makeErrRes(err.stack)
+  }
 }
 
 
-self.addEventListener('fetch', e => {
-  /** @type {Request} */
+global.addEventListener('fetch', e => {
   const req = e.request
   const urlStr = req.url
 
@@ -287,13 +297,14 @@ self.addEventListener('fetch', e => {
 })
 
 
-self.addEventListener('message', e => {
+global.addEventListener('message', e => {
   // console.log('sw msg:', e.data)
   const [cmd, val] = e.data
 
   switch (cmd) {
   case MSG.PAGE_COOKIE_PUSH:
     cookie.set(val)
+    // @ts-ignore
     sendMsgToPages(MSG.SW_COOKIE_PUSH, [val], e.source.id)
     break
   case MSG.PAGE_COOKIE_PULL:
@@ -320,34 +331,34 @@ self.addEventListener('message', e => {
     }))
     break
 
-  case MSG.PAGE_NODE_SWITCH:
-    const ret = network.switchNode(val)
-    if (ret) {
-      console.log('[jsproxy] node switch to: %s', val)
-    } else {
-      console.warn('[jsproxy] invalid node name:', val)
-    }
-    sendMsgToPages(MSG.SW_NODE_SWITCHED, val)
-    break
-  case MSG.PAGE_NODE_GET:
-    sendMsg(e.source, MSG.SW_NODE_SWITCHED, network.getNode())
-    break
+  // case MSG.PAGE_NODE_SWITCH:
+  //   const ret = network.switchNode(val)
+  //   if (ret) {
+  //     console.log('[jsproxy] node switch to: %s', val)
+  //   } else {
+  //     console.warn('[jsproxy] invalid node name:', val)
+  //   }
+  //   sendMsgToPages(MSG.SW_NODE_SWITCHED, val)
+  //   break
+  // case MSG.PAGE_NODE_GET:
+  //   sendMsg(e.source, MSG.SW_NODE_SWITCHED, network.getNode())
+  //   break
   }
 })
 
 
-self.addEventListener('install', e => {
+global.addEventListener('install', e => {
   console.log('oninstall:', e)
-	skipWaiting()
+	global.skipWaiting()
 })
 
 
 let sw
 
-self.addEventListener('activate', e => {
+global.addEventListener('activate', e => {
   clients.claim()
   console.log('onactivate:', e)
-  sw = registration.active
+  sw = global.registration.active
   sendMsgToPages(MSG.SW_READY, 1)
   sendMsg(sw, MSG.SW_LIFE_ADD)
 })

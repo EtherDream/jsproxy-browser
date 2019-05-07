@@ -4,6 +4,7 @@
   <title>Page Sandbox</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0">
+  <base target="_blank">
   <style>
     body {
       padding: 0 0.5em;
@@ -33,23 +34,34 @@
   <div class="box">
     <button id="btnGo" disabled>初始化中...</button>
   </div>
-  <div class="box">
+  <!-- <div class="box">
     <span>切换线路:</span>
     <select id="selNode" disabled>
-      <option value="aliyun-hk">轻量云-香港（直连）</option>
-      <option value="aliyun-sg">轻量云-新加坡（直连）</option>
-      <option value="bwh-los">搬瓦工-洛杉矶（直连）</option>
+      <optgroup label="直连">
+        <option value="aliyun-hk">轻量云-香港</option>
+        <option value="aliyun-sg">轻量云-新加坡</option>
+        <option value="bwh-los">搬瓦工-洛杉矶</option>
+        <option value="justhost-moscow">JustHost-莫斯科</option>
+      </optgroup>
+      <optgroup label="CF 代理">
+        <option value="cf-aliyun-hk">轻量云-香港</option>
+        <option value="cf-aliyun-sg">轻量云-新加坡</option>
+        <option value="cf-bwh-los">搬瓦工-洛杉矶</option>
+        <option value="cf-justhost-moscow">JustHost-莫斯科</option>
+      </optgroup>
     </select>
-  </div>
+  </div> -->
   <div class="box" id="list">
   </div>
   <script>
-    var PAGE_NODE_GET = 100
-    var PAGE_NODE_SWITCH = 102
-    var SW_NODE_SWITCHED = 103
+    // var PAGE_NODE_GET = 100
+    // var PAGE_NODE_SWITCH = 102
+    // var SW_NODE_SWITCHED = 103
     var SW_READY = 200
     var sw = navigator.serviceWorker
     var swCtl
+
+    // var txtURL = document.getElementById('txtURL')
 
     function main() {
       console.log('JsProxy v0.0.1 https://github.com/EtherDream/jsproxy/')
@@ -68,7 +80,7 @@
       sw.getRegistration().then(function(reg) {
       if (reg) {
         onSwReady()
-        sendMsgToSw(PAGE_NODE_GET)
+        // sendMsgToSw(PAGE_NODE_GET)
       } else {
         sw.register(getRootPath() + 'x.js')
           .then(onSwReady)
@@ -98,13 +110,6 @@
       return getRootPath() + '-----' + url
     }
 
-    function popup(url) {
-      var a = document.createElement('a')
-      a.rel = 'noopener'
-      a.href = url
-      a.click()
-    }
-
     btnGo.onclick = function() {
       var text = txtURL.value.trim()
       if (text.indexOf('-----') >= 0) {
@@ -113,7 +118,8 @@
       }
       var rawUrl = getNavUrl(text)
       var navUrl = encUrl(rawUrl)
-      popup(navUrl)
+      var win = open(navUrl)
+      win.opener = null
     }
     txtURL.onkeypress = function(e) {
       if (e.keyCode === 13) {
@@ -124,20 +130,20 @@
 
 
     function onSwReady() {
-      selNode.disabled = false
+      // selNode.disabled = false
 
       sw.addEventListener('message', function(e) {
         var data = e.data
         var cmd = data[0]
         var msg = data[1]
         switch (cmd) {
-        case SW_NODE_SWITCHED:
-          selNode
-            .querySelector('*[value=' + msg + ']')
-            .selected = true
-          break
+        // case SW_NODE_SWITCHED:
+        //   selNode
+        //     .querySelector('*[value=' + msg + ']')
+        //     .selected = true
+        //   break
         case SW_READY:
-          sendMsgToSw(PAGE_NODE_GET)
+          // sendMsgToSw(PAGE_NODE_GET)
           // preload
           new Image().src = 'https://www.google.com/favicon.ico'
           break
@@ -149,10 +155,10 @@
       txtURL.value = err
     }
 
-    selNode.onchange = function() {
-      var item = this.options[this.selectedIndex]
-      sendMsgToSw(PAGE_NODE_SWITCH, item.value)
-    }
+    // selNode.onchange = function() {
+    //   var item = this.options[this.selectedIndex]
+    //   sendMsgToSw(PAGE_NODE_SWITCH, item.value)
+    // }
 
     function sendMsgToSw(cmd, val) {
       var ctl = sw.controller

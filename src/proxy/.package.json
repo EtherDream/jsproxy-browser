@@ -11,5 +11,9 @@
   },
   "keywords": [],
   "author": "EtherDream",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "^5.16.0"
+  }
 }

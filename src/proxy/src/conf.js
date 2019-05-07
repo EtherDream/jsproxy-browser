@@ -1,4 +1,4 @@
-export const JS_VER = '30'
+export const JS_VER = '36'
 
 export const URL_FILE = 'x.js'
 export const URL_DELIM = '-----'
@@ -100,15 +100,16 @@ export const DIRECT_HOST = [
   'ci.phncdn.com',
 ]
 
-// TODO: 使用更智能的节点选择算法
-export const NODE_MAP = {
-  'aliyun-hk': 'node-v2-aliyun-hk.etherdream.com:8443',
-  'aliyun-sg': 'node-v2-aliyun-sg.etherdream.com:8443',
-  'cf-aliyun-hk': 'node-v2-cf-aliyun-hk.etherdream.com:8443',
-  'cf-aliyun-sg': 'node-v2-cf-aliyun-sg.etherdream.com:8443',
-  'bwh-los': 'node-v2-bwh-los.etherdream.com:8443',
-  'cf-bwh-los': 'node-v2-cf-bwh-los.etherdream.com:8443',
+export function getNodeHost(id) {
+  return `node-${id}.etherdream.com:8443`
 }
 
-// 默认节点
-export const NODE_DEF = 'aliyun-hk'
+// 默认节点（延时低、带宽小、费用高）
+export const NODE_MAIN = 'aliyun-hk'
+
+// 后备节点（延时高、带宽大、费用低）
+export const NODE_BACKUP = [
+  'cfworker',
+  'aliyun-sg',
+  'justhost-moscow',
+]

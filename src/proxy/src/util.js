@@ -67,3 +67,15 @@ export function concatBufs(bufs) {
   })
   return ret
 }
+
+
+/**
+ * @param {string} str 
+ */
+export function strHash(str) {
+  let sum = 0
+  for (let i = 0, n = str.length; i < n; i++) {
+    sum = (sum * 31 + str.charCodeAt(i)) >>> 0
+  }
+  return sum;
+}

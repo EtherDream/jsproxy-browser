@@ -23,7 +23,7 @@ function isInternalUrl(url) {
 
 /**
  * @param {string} url 
- * @param {string} baseUrl 
+ * @param {string | URL=} baseUrl 
  */
 export function newUrl(url, baseUrl) {
   try {
