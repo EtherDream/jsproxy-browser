@@ -281,25 +281,31 @@ global.addEventListener('fetch', e => {
   if (urlStr === env.PATH_ROOT) {
     return
   }
+
   if (urlStr === env.PATH_HELPER_JS) {
-    return fetch(self['__FILE__'])
+    const ret = fetch(self['__FILE__'])
+    e.respondWith(ret)
+    return
   }
 
   // 静态资源
   if (urlStr.startsWith(env.PATH_ASSETS)) {
     const filePath = urlStr.substr(env.PATH_ASSETS.length)
-    return fetch(CDN + filePath)
+    const ret = fetch(CDN + filePath)
+    e.respondWith(ret)
+    return
   }
 
   const targetUrlStr = urlx.decUrlStrAbs(urlStr)
   const targetUrlObj = urlx.newUrl(targetUrlStr)
 
-  let ret
   if (targetUrlObj) {
-    ret = proxy(e, targetUrlObj)
-  } else {
-    ret = makeErrRes('invalid url: ' + targetUrlStr)
+    const ret = proxy(e, targetUrlObj)
+    e.respondWith(ret)
+    return
   }
+
+  const ret = makeErrRes('invalid url: ' + targetUrlStr)
   e.respondWith(ret)
 })
 
