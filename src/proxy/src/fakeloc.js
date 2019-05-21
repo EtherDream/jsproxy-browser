@@ -1,6 +1,4 @@
 import * as urlx from "./urlx";
-import * as env from './env.js'
-
 
 const {
   defineProperty,
@@ -22,13 +20,10 @@ function setup(obj, fakeLoc) {
 
 
 /**
- * @param {WindowOrWorkerGlobalScope} global
+ * @param {Window} global  WindowOrWorkerGlobalScope
  */
 export function createFakeLoc(global) {
-  const {
-    location,
-  } = global
-
+  const location = global.location
   let ancestorOrigins
 
   /**
@@ -109,35 +104,35 @@ export function createFakeLoc(global) {
 
     set protocol(val) {
       console.log('[jsproxy] set location.protocol:', val)
-      const urlObj = getPageUrlObj()
+      const urlObj = getPageUrlObj(location)
       urlObj.href = val
       location.href = urlx.encUrlObj(urlObj)
     },
 
     set host(val) {
       console.log('[jsproxy] set location.host:', val)
-      const urlObj = getPageUrlObj()
+      const urlObj = getPageUrlObj(location)
       urlObj.host = val
       location.href = urlx.encUrlObj(urlObj)
     },
 
     set hostname(val) {
       console.log('[jsproxy] set location.hostname:', val)
-      const urlObj = getPageUrlObj()
+      const urlObj = getPageUrlObj(location)
       urlObj.hostname = val
       location.href = urlx.encUrlObj(urlObj)
     },
 
     set port(val) {
       console.log('[jsproxy] set location.port:', val)
-      const urlObj = getPageUrlObj()
+      const urlObj = getPageUrlObj(location)
       urlObj.port = val
       location.href = urlx.encUrlObj(urlObj)
     },
 
     set pathname(val) {
       console.log('[jsproxy] set location.pathname:', val)
-      const urlObj = getPageUrlObj()
+      const urlObj = getPageUrlObj(location)
       urlObj.pathname = val
       location.href = urlx.encUrlObj(urlObj)
     },
@@ -152,7 +147,8 @@ export function createFakeLoc(global) {
 
     reload() {
       console.warn('[jsproxy] location.reload')
-      location.reload(...arguments)
+      // @ts-ignore
+      return location.reload(...arguments)
     },
 
     replace(val) {
@@ -160,7 +156,8 @@ export function createFakeLoc(global) {
         console.warn('[jsproxy] location.replace:', val)
         arguments[0] = urlx.encUrlStrRel(val, this)
       }
-      location.replace(...arguments)
+      // @ts-ignore
+      return location.replace(...arguments)
     },
 
     assign(val) {
@@ -168,7 +165,8 @@ export function createFakeLoc(global) {
         console.warn('[jsproxy] location.assign:', val)
         arguments[0] = urlx.encUrlStrRel(val, this)
       }
-      location.assign(...arguments)
+      // @ts-ignore
+      return location.assign(...arguments)
     },
   }
 
@@ -177,7 +175,7 @@ export function createFakeLoc(global) {
   setup(global, fakeLoc)
 
   // 非 Worker 环境
-  const Document = global.Document
+  const Document = global['Document']
   if (Document) {
     // TODO: document.hasOwnProperty('location') 原本是 true
     setup(Document.prototype, fakeLoc)

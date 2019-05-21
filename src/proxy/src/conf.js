@@ -1,6 +1,5 @@
-export const JS_VER = '36'
+export const JS_VER = '49'
 
-export const URL_FILE = 'x.js'
 export const URL_DELIM = '-----'
 //
 // 不走代理的直连资源
@@ -15,6 +14,10 @@ export const URL_DELIM = '-----'
 // 2.请求不产生 preflight
 //
 export const DIRECT_HOST = [
+  // js cdn
+  'cdn.jsdelivr.net',
+  'unpkg.com',
+
   // ali
   'at.alicdn.com',
   'img.alicdn.com',
@@ -101,15 +104,29 @@ export const DIRECT_HOST = [
 ]
 
 export function getNodeHost(id) {
+  if (id === 'local') {
+    return 'localhost:8080'
+  }
   return `node-${id}.etherdream.com:8443`
 }
 
-// 默认节点（延时低、带宽小、费用高）
-export const NODE_MAIN = 'aliyun-hk'
+// 默认节点
+export const NODE_DEF = 'aliyun-hk'
 
-// 后备节点（延时高、带宽大、费用低）
-export const NODE_BACKUP = [
-  'cfworker',
-  'aliyun-sg',
-  'justhost-moscow',
-]
+export const NODE_MAP = {
+  'aliyun-hk': 2,
+  'aliyun-sg': 1,
+  'bwh-la': 1,
+  'justhost-moscow': 1,
+  'justhost-novosibirsk': 1,
+  'bungeecloud-fr': 1,
+
+  'cf-aliyun-hk': 1,
+  'cf-aliyun-sg': 1,
+  'cf-bwh-la': 1,
+  'cf-justhost-moscow': 1,
+  'cf-justhost-novosibirsk': 1,
+  'cf-bungeecloud-fr': 1,
+
+  'local': 1,
+}

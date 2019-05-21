@@ -1,6 +1,7 @@
 import * as conf from './conf.js'
 import * as cookie from './cookie.js'
 import * as urlx from './urlx.js'
+import * as util from './util'
 import * as tld from './tld.js'
 
 const REFER_ORIGIN = location.origin + '/'
@@ -20,19 +21,20 @@ const directHostSet = new Set(conf.DIRECT_HOST)
 
 /**
  * @param {URL} targetUrlObj 
- * @param {string} clientTld 
+ * @param {URL} clientUrlObj 
  * @param {Request} req 
  */
-function getReqCookie(targetUrlObj, clientTld, req) {
+function getReqCookie(targetUrlObj, clientUrlObj, req) {
   const cred = req.credentials
   if (cred === 'omit') {
-    return
+    return ''
   }
   if (cred === 'same-origin') {
     // TODO:
     const targetTld = tld.getTld(targetUrlObj.hostname)
+    const clientTld = tld.getTld(clientUrlObj.hostname)
     if (targetTld !== clientTld) {
-      return
+      return ''
     }
   }
   return cookie.concat(targetUrlObj)
@@ -59,23 +61,29 @@ function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
 
 
 /**
- * @param {Headers} resHdrRaw 
+ * @param {Response} res 
  */
-function getResInfo(resHdrRaw) {
+function getResInfo(res) {
+  const resHdrRaw = res.headers
+
   /** @type {string[]} */
   const cookieStrArr = []
 
   const headers = new Headers()
-  let status = 0
+
+  let status = res.status
+  if (status === 311 ||
+      status === 312 ||
+      status === 313 ||
+      status === 317 ||
+      status === 318
+  ) {
+    status -= 10
+  }
 
   resHdrRaw.forEach((val, key) => {
     if (key === 'access-control-allow-origin' ||
         key === 'access-control-expose-headers') {
-      return
-    }
-    // 原始状态码
-    if (key === '--s') {
-      status = +val
       return
     }
     if (key === '--t') {
@@ -166,11 +174,8 @@ function initReqHdr(req, urlObj, cliUrlObj) {
     }
   }
 
-  const cliTld = tld.getTld(cliUrlObj.hostname)
-  const cookie = getReqCookie(urlObj, cliTld, req)
-  if (cookie) {
-    sysHdr.set('--cookie', cookie)
-  }
+  const cookie = getReqCookie(urlObj, cliUrlObj, req)
+  sysHdr.set('--cookie', cookie)
 
   if (hasExtHdr) {
     sysHdr.set('--ext', JSON.stringify(extHdr))
@@ -180,6 +185,7 @@ function initReqHdr(req, urlObj, cliUrlObj) {
   }
   return sysHdr
 }
+
 
 /**
  * 直连的资源
@@ -193,21 +199,22 @@ async function proxyDirect(urlObj, req, reqOpt) {
 
   // 从地址栏访问资源，请求头会出现该字段，导致出现 preflight
   if (hdr.has('upgrade-insecure-requests')) {
-    hdr = new Headers(req.headers)
+    hdr = new Headers(hdr)
     hdr.delete('upgrade-insecure-requests')
   }
   reqOpt.headers = hdr
 
   try {
     const res = await fetch(urlObj.href, reqOpt)
-    if (res.status === 200) {
+    if (res.status === 200 || res.status === 206) {
       return res
     }
+    console.warn('[jsproxy] proxyDirect invalid status:', res.status, urlObj.href)
   } catch (err) {
+    console.warn('[jsproxy] proxyDirect fail:', urlObj.href)
   }
-  console.warn('[jsproxy] direct proxy fail:', urlObj.href)
-  return null
 }
+
 
 /**
  * @param {string} url
@@ -226,9 +233,8 @@ async function proxyNode2(url, reqOpt) {
     return null
   }
 
-  const rawStatus = +res.headers.get('--s')
-  if (rawStatus !== 200 && rawStatus !== 206) {
-    console.warn('[jsproxy] proxy invalid status:', rawStatus)
+  if (res.status !== 200 && res.status !== 206) {
+    console.warn('[jsproxy] proxy invalid status:', res.status)
     return null
   }
 
@@ -267,18 +273,27 @@ export async function launch(req, urlObj, cliUrlObj) {
   /** @type {Response} */
   let res
 
-  // 非 HTTP 协议的资源，直接访问
-  // 例如 youtube 引用了 chrome-extension: 协议的脚本
   if (!urlx.isHttpProto(urlObj.protocol)) {
-    reqOpt.headers = req.headers
+    // 非 HTTP 协议的资源，直接访问
+    // 例如 youtube 引用了 chrome-extension: 协议的脚本
     res = await fetch(req)
-  }
-  // 支持 cors 的资源，直接访问
-  else if (
-    method === 'GET' &&
-    directHostSet.has(urlObj.host)
-  ) {
-    res = await proxyDirect(urlObj, req, reqOpt)
+  } else {
+    if (method === 'GET' &&
+        directHostSet.has(urlObj.host)
+    ) {
+      // 支持 cors 的资源
+      // 有些服务器配置了 acao: *，直连可加速
+      res = await proxyDirect(urlObj, req, reqOpt)
+    }
+    else {
+      // 本地 CDN 加速
+      // 一些大网站常用的静态资源存储在 jsdelivr 上
+      const fileID = getCdnFileId(urlObj.href)
+      if (fileID !== -1) {
+        res = await proxyFromCdn(fileID)
+        console.log('cdn hit:', urlObj.href)
+      }
+    }
   }
 
   if (res) {
@@ -286,11 +301,11 @@ export async function launch(req, urlObj, cliUrlObj) {
       res,
       status: res.status || 200,
       headers: new Headers(res.headers),
-      cookies: null
     }
   }
 
-  // 走代理，请求参数打包在头部字段
+  // 以上都不可用，走自己的代理服务器
+  // 请求参数打包在头部字段
   const reqHdr = initReqHdr(req, urlObj, cliUrlObj)
   reqOpt.headers = reqHdr
 
@@ -319,6 +334,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     level++
     reqHdr.set('--level', level + '')
     proxyUrl = genHttpUrl(urlObj, level)
+
     res = await proxyNode2(proxyUrl, reqOpt)
     if (res) {
       break
@@ -333,11 +349,12 @@ export async function launch(req, urlObj, cliUrlObj) {
 
   const {
     status, headers, cookieStrArr
-  } = getResInfo(res.headers)
+  } = getResInfo(res)
 
-  const cookies = cookieStrArr.length
-    ? procResCookie(cookieStrArr, urlObj, cliUrlObj)
-    : null
+  let cookies
+  if (cookieStrArr.length) {
+    cookies = procResCookie(cookieStrArr, urlObj, cliUrlObj)
+  }
 
   return {res, status, headers, cookies}
 }
@@ -345,22 +362,34 @@ export async function launch(req, urlObj, cliUrlObj) {
 
 /**
  * @param {URL} urlObj 
+ * @param {string} node 
+ */
+function selectNodeLine(urlObj, node) {
+  const lines = conf.NODE_MAP[node]
+  if (lines > 1) {
+    const id = util.strHash(urlObj.href) % lines
+    node += ('-' + id)
+  }
+  return node
+}
+
+/**
+ * @param {URL} urlObj 
  * @param {number} level 
  */
 export function genHttpUrl(urlObj, level) {
-  let node = curNode
-
-  // 临时测试
-  if (/video/.test(urlObj.hostname)) {
-    node = 'aliyun-sg'
-  }
+  let node
 
   if (level === 2) {
     node = 'cfworker'
+  } else {
+    node = selectNodeLine(urlObj, curNode)
   }
 
   let host = conf.getNodeHost(node)
-  return `https://${host}/http`
+
+  const ssl = (node === 'local') ? '' : 's'
+  return `http${ssl}://${host}/http`
 }
 
 
@@ -384,10 +413,90 @@ export function genWsUrl(urlObj, args) {
   args['url__'] = scheme + '://' + t
   args['ver__'] = conf.JS_VER
 
-  const host = conf.getNodeHost(curNode)
-  return `wss://${host}/ws?` + new URLSearchParams(args)
+  const node = selectNodeLine(urlObj, curNode)
+  const host = conf.getNodeHost(node)
+
+  const ssl = (curNode === 'local') ? '' : 's'
+  return `ws${ssl}://${host}/ws?` + new URLSearchParams(args)
 }
 
 
 // TODO: 临时测试
-let curNode = conf.NODE_MAIN
+let curNode = conf.NODE_DEF
+
+
+/**
+ * @param {string} node 
+ */
+export function switchNode(node) {
+  curNode = node
+  if (! (conf.NODE_MAP[node] > 0)) {
+    return false
+  }
+  console.log('[jsproxy] switchNode:', node)
+  return true
+}
+
+
+export function getNode() {
+  return curNode
+}
+
+
+const CDN = 'https://cdn.jsdelivr.net/gh/zjcqoo/cache@'
+
+/** @type {Uint32Array} */
+let gCdnUrlHashList
+
+
+
+export async function loadManifest() {
+  const res = await fetch(CDN + '4/list.txt')
+  const buf = await res.arrayBuffer()
+  gCdnUrlHashList = new Uint32Array(buf)
+}
+
+
+/**
+ * @param {string} url 
+ */
+export function getCdnFileId(url) {
+  if (!gCdnUrlHashList) {
+    return -1
+  }
+  const urlHash = util.strHash(url)
+  const fileId = util.binarySearch(gCdnUrlHashList, urlHash)
+  return fileId
+}
+
+
+/**
+ * @param {number} id 
+ */
+export async function proxyFromCdn(id) {
+  const urlHash = gCdnUrlHashList[id]
+  const hashHex = util.numToHex(urlHash, 8)
+
+  try {
+    const res = await fetch(CDN + '3/' + hashHex + '.txt')
+    var buf = await res.arrayBuffer()
+  } catch (err) {
+    console.warn('[jsproxy] proxyFromCdn fail')
+    return
+  }
+
+  const b = new Uint8Array(buf)
+  
+  const hdrLen = b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]
+  const hdrBuf = b.subarray(4, 4 + hdrLen)
+  const hdrStr = util.bytesToStr(hdrBuf)
+  const hdrObj = JSON.parse(hdrStr)
+
+  const body = b.subarray(4 + hdrLen)
+  hdrObj['date'] = new Date().toUTCString()
+
+  return new Response(body, {
+    status: 200,
+    headers: hdrObj
+  })
+}

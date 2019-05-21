@@ -63,7 +63,7 @@ class CookieDomainNode {
   }
 
   /**
-   * @param {string} cookie 
+   * @param {string} name 
    */
   nextChild(name) {
     return this.children[name] || (
@@ -72,7 +72,7 @@ class CookieDomainNode {
   }
 
   /**
-   * @param {string} cookie 
+   * @param {string} name 
    */
   getChild(name) {
     return this.children[name]
@@ -97,7 +97,7 @@ const cookieNodeRoot = new CookieDomainNode()
 
 
 
-export function getAll() {
+export function getNonHttpOnlyItems() {
   /** @type {Cookie[]} */
   const ret = []
   idCookieMap.forEach(item => {
@@ -164,7 +164,7 @@ export function parse(str, urlObj) {
       item.secure = true
       break
     case 'max-age':
-      item.expires = now() + val * 1000
+      item.expires = now() + (+val) * 1000
       break
     case 'samesite':
       item.sameSite = val

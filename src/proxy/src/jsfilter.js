@@ -14,7 +14,7 @@ export function parseStr(code) {
   })
   code = code.replace(/postMessage\s*\(/g, s => {
     match = true
-    return s + '...__set_srcWin(), '
+    return s + `...(self.__set_srcWin?__set_srcWin():[]), `
   })
   if (match) {
     return code

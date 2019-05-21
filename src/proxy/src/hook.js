@@ -61,7 +61,7 @@ export function prop(obj, key, g, s) {
 
 
 /**
- * @param {WindowOrWorkerGlobalScope} win 
+ * @param {Window} win WindowOrWorkerGlobalScope
  */
 export function createDomHook(win) {
   /**
@@ -86,7 +86,7 @@ export function createDomHook(win) {
     )
   }
 
-  const elemProto = win.Element.prototype
+  const elemProto = win['Element'].prototype
   const rawGetAttr = elemProto.getAttribute
   const rawSetAttr = elemProto.setAttribute
 

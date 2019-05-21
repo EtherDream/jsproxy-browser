@@ -5,9 +5,9 @@ import * as util from "./util";
 
 
 const WORKER_INJECT = util.strToBytes(`\
-if (typeof importScripts === 'function' && !self.window) {
+if (typeof importScripts === 'function' && !self.window && !self.__PATH__) {
   self.__PATH__ = '${env.PATH_ROOT}';
-  importScripts('${env.PATH_JS}');
+  importScripts('${env.PATH_HELPER_JS}');
 }
 `)
 
@@ -43,7 +43,7 @@ export function getHtmlCode(urlObj, pageId) {
 <link rel="icon" href="${icoUrl}" type="image/x-icon">
 <meta http-equiv="content-security-policy" content="frame-src ${CSP}; object-src ${CSP}">
 <base href="${urlObj.href}">
-<script data-id="${pageId}" src="${env.PATH_JS}"></script>
+<script data-id="${pageId}" src="${env.PATH_HELPER_JS}"></script>
 <!-- https://github.com/EtherDream/jsproxy -->
 <!-- PADDING ${PADDING} -->
 

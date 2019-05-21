@@ -34,37 +34,43 @@
   <div class="box">
     <button id="btnGo" disabled>初始化中...</button>
   </div>
-  <!-- <div class="box">
+  <div class="box">
     <span>切换线路:</span>
     <select id="selNode" disabled>
       <optgroup label="直连">
         <option value="aliyun-hk">轻量云-香港</option>
         <option value="aliyun-sg">轻量云-新加坡</option>
-        <option value="bwh-los">搬瓦工-洛杉矶</option>
+        <option value="bwh-la">搬瓦工-洛杉矶</option>
         <option value="justhost-moscow">JustHost-莫斯科</option>
+        <option value="justhost-novosibirsk">JustHost-新西伯利亚</option>
+        <option value="bungeecloud-fr">BungeeCloud-法国</option>
       </optgroup>
       <optgroup label="CF 代理">
         <option value="cf-aliyun-hk">轻量云-香港</option>
         <option value="cf-aliyun-sg">轻量云-新加坡</option>
-        <option value="cf-bwh-los">搬瓦工-洛杉矶</option>
+        <option value="cf-bwh-la">搬瓦工-洛杉矶</option>
         <option value="cf-justhost-moscow">JustHost-莫斯科</option>
+        <option value="cf-justhost-novosibirsk">JustHost-新西伯利亚</option>
+        <option value="cf-bungeecloud-fr">BungeeCloud-法国</option>
+      </optgroup>
+      <optgroup label="测试">
+        <option value="local">localhost</option>
       </optgroup>
     </select>
-  </div> -->
+  </div>
   <div class="box" id="list">
   </div>
   <script>
-    // var PAGE_NODE_GET = 100
-    // var PAGE_NODE_SWITCH = 102
-    // var SW_NODE_SWITCHED = 103
+    var PAGE_NODE_GET = 100
+    var PAGE_NODE_SWITCH = 102
+    var SW_NODE_SWITCHED = 103
     var SW_READY = 200
     var sw = navigator.serviceWorker
     var swCtl
 
-    // var txtURL = document.getElementById('txtURL')
 
     function main() {
-      console.log('JsProxy v0.0.1 https://github.com/EtherDream/jsproxy/')
+      console.log('JsProxy v0.0.9 https://github.com/EtherDream/jsproxy/')
 
       if (!self.isSecureContext) {
         txtURL.value = '本程序需要 HTTPS 站点'
@@ -80,9 +86,9 @@
       sw.getRegistration().then(function(reg) {
       if (reg) {
         onSwReady()
-        // sendMsgToSw(PAGE_NODE_GET)
+        sendMsgToSw(PAGE_NODE_GET)
       } else {
-        sw.register(getRootPath() + 'x.js')
+        sw.register(getRootPath() + 'sw.js')
           .then(onSwReady)
           .catch(onSwFail)
         }
@@ -90,7 +96,15 @@
     }
 
     function getRootPath() {
-      return location.href.replace(/[^/]+$/, '/')
+      // https://a.com/ -> /
+      // https://a.com/index.html -> /
+      // https://a.com/index.php -> /
+      // https://a.com/path/to/ -> /path/to/
+      // https://a.com/path/to -> /path/to/
+      // https://a.com/path/to/index.html -> /path/to/
+      return location.pathname
+        .replace(/\w+\.\w+$/, '')
+        .replace(/\/*$/, '/')
     }
 
     function getNavUrl(text) {
@@ -130,20 +144,25 @@
 
 
     function onSwReady() {
-      // selNode.disabled = false
+      setTimeout(showIcons, 100)
+      selNode.disabled = false
 
       sw.addEventListener('message', function(e) {
         var data = e.data
         var cmd = data[0]
         var msg = data[1]
         switch (cmd) {
-        // case SW_NODE_SWITCHED:
-        //   selNode
-        //     .querySelector('*[value=' + msg + ']')
-        //     .selected = true
-        //   break
+        case SW_NODE_SWITCHED:
+          selNode
+            .querySelector('*[value=' + msg + ']')
+            .selected = true
+          break
         case SW_READY:
-          // sendMsgToSw(PAGE_NODE_GET)
+          if (location.hash === '#local') {
+            sendMsgToSw(PAGE_NODE_SWITCH, 'local')
+          } else {
+            sendMsgToSw(PAGE_NODE_GET)
+          }
           // preload
           new Image().src = 'https://www.google.com/favicon.ico'
           break
@@ -155,10 +174,10 @@
       txtURL.value = err
     }
 
-    // selNode.onchange = function() {
-    //   var item = this.options[this.selectedIndex]
-    //   sendMsgToSw(PAGE_NODE_SWITCH, item.value)
-    // }
+    selNode.onchange = function() {
+      var item = this.options[this.selectedIndex]
+      sendMsgToSw(PAGE_NODE_SWITCH, item.value)
+    }
 
     function sendMsgToSw(cmd, val) {
       var ctl = sw.controller
@@ -183,13 +202,13 @@
       ['blogger', '']
     ]
 
-    window.onload = function() {
+    function showIcons() {
       list.innerHTML = sites.map(function(arr) {
         var id = arr[0]
         var url = arr[1] || ('www.' + id + '.com')
 
         return '<a rel=noopener href=/-----https://' + url + '>' +
-          '<img width=128 height=128 src=ico/' + id + '.png></a>'
+          '<img width=128 height=128 src=assets/ico/' + id + '.png></a>'
       }).join('')
     }
 

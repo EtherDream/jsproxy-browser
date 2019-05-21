@@ -1,0 +1,1 @@
+importScripts(__FILE__=location.origin+'/bundle.debug.js')

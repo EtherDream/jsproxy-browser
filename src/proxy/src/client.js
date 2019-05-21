@@ -1,12 +1,9 @@
 import * as urlx from './urlx.js'
 import * as network from './network.js'
 import * as env from './env.js'
+import * as hook from './hook.js'
 import {createFakeLoc} from './fakeloc.js'
 import {createStorage} from './storage.js'
-import {
-  prop as hookProp,
-  func as hookFunc,
-} from './hook.js'
 
 
 const {
@@ -18,7 +15,7 @@ const {
 /**
  * Hook 页面和 Worker 相同的 API
  * 
- * @param {WindowOrWorkerGlobalScope} global
+ * @param {Window} global WindowOrWorkerGlobalScope
  * @param {string} origin 
  */
 export function init(global, origin) {
@@ -31,8 +28,8 @@ export function init(global, origin) {
   const fakeLoc = createFakeLoc(global)
 
   // hook Performance API
-  const perfProto = global.PerformanceEntry.prototype
-  hookProp(perfProto, 'name',
+  const perfProto = global['PerformanceEntry'].prototype
+  hook.prop(perfProto, 'name',
     getter => function() {
       const val = getter.call(this)
       if (/^https?:/.test(val)) {
@@ -44,15 +41,15 @@ export function init(global, origin) {
 
 
   // hook AJAX API
-  const xhrProto = global.XMLHttpRequest.prototype
-  hookFunc(xhrProto, 'open', oldFn => function(_0, url) {
+  const xhrProto = global['XMLHttpRequest'].prototype
+  hook.func(xhrProto, 'open', oldFn => function(_0, url) {
     if (url) {
       arguments[1] = urlx.encUrlStrRel(url, this)
     }
     return apply(oldFn, this, arguments)
   })
 
-  hookProp(xhrProto, 'responseURL',
+  hook.prop(xhrProto, 'responseURL',
     getter => function(oldFn) {
       const val = getter.call(this)
       return urlx.decUrlStrRel(val, this)
@@ -60,7 +57,7 @@ export function init(global, origin) {
   )
 
 
-  hookFunc(global, 'fetch', oldFn => function(v) {
+  hook.func(global, 'fetch', oldFn => function(v) {
     if (v) {
       if (v.url) {
         // v is Request
@@ -76,7 +73,7 @@ export function init(global, origin) {
   })
 
 
-  hookFunc(global, 'WebSocket', oldFn => function(url) {
+  hook.func(global, 'WebSocket', oldFn => function(url) {
     const urlObj = urlx.newUrl(url)
     if (urlObj) {
       const {ori} = env.get(this)
@@ -94,7 +91,7 @@ export function init(global, origin) {
    * @param {string} type 
    */
   function hookWorker(type) {
-    hookFunc(global, type, oldFn => function(url) {
+    hook.func(global, type, oldFn => function(url) {
       if (url) {
         console.log('[jsproxy] new %s: %s', type, url)
         arguments[0] = urlx.encUrlStrRel(url, this)
@@ -107,7 +104,7 @@ export function init(global, origin) {
   hookWorker('SharedWorker')
 
 
-  hookFunc(global, 'importScripts', oldFn => function(...args) {
+  hook.func(global, 'importScripts', oldFn => function(...args) {
     const urls = args.map(urlx.encUrlStrRel)
     console.log('[jsproxy] importScripts:', urls)
     return apply(oldFn, this, urls)

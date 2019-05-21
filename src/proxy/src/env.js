@@ -1,7 +1,7 @@
 import * as conf from './conf.js'
 
 /**
- * @type {Map<Object, {loc: Location, doc: Document, ori: URL, domHook: object}>}
+ * @type {WeakMap<Object, {loc: Location, doc: Document, ori: URL, domHook: object}>}
  */
 const objInfoMap = new WeakMap()
 
@@ -17,10 +17,9 @@ export function get(obj) {
 
 
 export const PATH_ROOT = getRootPath() 
-export const PATH_HOME = PATH_ROOT + 'index.html'
-export const PATH_JS = PATH_ROOT + conf.URL_FILE
+export const PATH_HELPER_JS = PATH_ROOT + 'helper.js'
+export const PATH_ASSETS = PATH_ROOT + 'assets/'
 export const PATH_PREFIX = PATH_ROOT + conf.URL_DELIM
-export const PATH_SYS = PATH_ROOT + 'sys__/'
 
 function getRootPath() {
   //
@@ -33,7 +32,7 @@ function getRootPath() {
   // 返回：
   //   https://example.com/path/to/
   //
-  const envPath = self.__PATH__
+  const envPath = self['__PATH__']
   if (envPath) {
     return envPath
   }

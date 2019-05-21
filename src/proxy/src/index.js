@@ -20,24 +20,27 @@ function pageEnv(win) {
       return ret
     }
 
+    // eslint-disable-next-line no-undef
     const page = require('./page.js')
     page.init(win)
     console.log('[jsproxy] top page inited')
   } else {
     // 子页面直接调用 top 提供的接口，无需重复初始化
-    top.__init__(win)
+    top['__init__'](win)
 
     win.__set_srcWin = function() {
-      return top.__set_srcWin(win)
+      return top['__set_srcWin'](win)
     }
   }
 }
 
 function swEnv() {
+  // eslint-disable-next-line no-undef
   require('./sw.js')
 }
 
 function workerEnv(global) {
+  // eslint-disable-next-line no-undef
   require('./client.js').init(global, location.origin)
   global.__set_srcWin = function() {
     return []

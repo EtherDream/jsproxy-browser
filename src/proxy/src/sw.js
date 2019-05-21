@@ -29,7 +29,7 @@ function sendMsg(target, cmd, val) {
 // 也可以用 clientId 关联，但兼容性不高
 let pageCounter = 0
 
-/** @type {Map<number, [Function, number]} */
+/** @type {Map<number, [Function, number]>} */
 const pageWaitMap = new Map()
 
 function genPageId() {
@@ -203,21 +203,19 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
       status === 308
   ) {
     const locStr = headers.get('location')
-    if (locStr) {
-      // 如果重定向到相对路径，则基于请求的 URL（不是页面的 URL）
-      const locObj = urlx.newUrl(locStr, urlObj)
-      if (locObj) {
-        // 跟随模式，返回最终数据
-        if (req.redirect === 'follow') {
-          if (++redirNum === MAX_REDIR) {
-            return makeErrRes('too many redirects')
-          }
-          return forward(req, locObj, cliUrlObj, redirNum)
+    const locObj = locStr && urlx.newUrl(locStr, urlObj)
+    if (locObj) {
+      // 跟随模式，返回最终数据
+      if (req.redirect === 'follow') {
+        if (++redirNum === MAX_REDIR) {
+          return makeErrRes('too many redirects')
         }
-        // 不跟随模式（例如页面跳转），返回 30X 状态
-        headers.set('location', urlx.encUrlObj(locObj))
+        return forward(req, locObj, cliUrlObj, redirNum)
       }
+      // 不跟随模式（例如页面跳转），返回 30X 状态
+      headers.set('location', urlx.encUrlObj(locObj))
     }
+
     // firefox, safari 保留内容会提示页面损坏
     return new Response(null, resOpt)
   }
@@ -274,14 +272,23 @@ async function proxy(e, urlObj) {
 }
 
 
+const CDN = 'https://cdn.jsdelivr.net/gh/etherdream/jsproxy-browser@dev/www/assets/'
+
 global.addEventListener('fetch', e => {
   const req = e.request
   const urlStr = req.url
 
-  // homepage, or injected js
-  if (urlStr.startsWith(env.PATH_ROOT) && 
-    !urlStr.startsWith(env.PATH_PREFIX)) {
+  if (urlStr === env.PATH_ROOT) {
     return
+  }
+  if (urlStr === env.PATH_HELPER_JS) {
+    return fetch(self['__FILE__'])
+  }
+
+  // 静态资源
+  if (urlStr.startsWith(env.PATH_ASSETS)) {
+    const filePath = urlStr.substr(env.PATH_ASSETS.length)
+    return fetch(CDN + filePath)
   }
 
   const targetUrlStr = urlx.decUrlStrAbs(urlStr)
@@ -309,7 +316,7 @@ global.addEventListener('message', e => {
     break
   case MSG.PAGE_COOKIE_PULL:
     // console.log('SW MSG.COOKIE_PULL:', e.source.id)
-    sendMsg(e.source, MSG.SW_COOKIE_PUSH, cookie.getAll())
+    sendMsg(e.source, MSG.SW_COOKIE_PUSH, cookie.getNonHttpOnlyItems())
     break
 
   case MSG.PAGE_INIT_BEG:
@@ -331,18 +338,17 @@ global.addEventListener('message', e => {
     }))
     break
 
-  // case MSG.PAGE_NODE_SWITCH:
-  //   const ret = network.switchNode(val)
-  //   if (ret) {
-  //     console.log('[jsproxy] node switch to: %s', val)
-  //   } else {
-  //     console.warn('[jsproxy] invalid node name:', val)
-  //   }
-  //   sendMsgToPages(MSG.SW_NODE_SWITCHED, val)
-  //   break
-  // case MSG.PAGE_NODE_GET:
-  //   sendMsg(e.source, MSG.SW_NODE_SWITCHED, network.getNode())
-  //   break
+  case MSG.PAGE_NODE_SWITCH:
+    if (network.switchNode(val)) {
+      console.log('[jsproxy] node switch to: %s', val)
+    } else {
+      console.warn('[jsproxy] invalid node name:', val)
+    }
+    sendMsgToPages(MSG.SW_NODE_SWITCHED, val)
+    break
+  case MSG.PAGE_NODE_GET:
+    sendMsg(e.source, MSG.SW_NODE_SWITCHED, network.getNode())
+    break
   }
 })
 
@@ -361,6 +367,9 @@ global.addEventListener('activate', e => {
   sw = global.registration.active
   sendMsgToPages(MSG.SW_READY, 1)
   sendMsg(sw, MSG.SW_LIFE_ADD)
+
+  // TODO: read
+  network.loadManifest()
 })
 
 

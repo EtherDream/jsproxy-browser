@@ -17,21 +17,23 @@ function onfail(err) {
   t.innerHTML = err.message
 }
 
-
-var sw = navigator.serviceWorker
-if (!sw || !self.ReadableStream) {
-  t.innerHTML = '请使用最新版 Chrome 浏览器访问'
-} else {
+function main() {
+  var sw = navigator.serviceWorker
+  if (!sw || !self.ReadableStream) {
+    t.innerHTML = '请使用最新版 Chrome 浏览器访问'
+    return
+  }
   sw.getRegistration().then(function(reg) {
     if (reg) {
       reload()
-    } else {
-      var root = location.href.split('-----')[0]
-      sw.register(root + 'x.js')
-        .then(reload)
-        .catch(onfail)
+      return
     }
+    var root = location.href.split('-----')[0]
+    sw.register(root + 'x.js')
+      .then(reload)
+      .catch(onfail)
   })
 }
+main()
 </script>
 </body>

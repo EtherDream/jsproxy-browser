@@ -79,3 +79,47 @@ export function strHash(str) {
   }
   return sum;
 }
+
+
+/**
+ * 使用二分法查找数组中的元素
+ * 
+ * @param {ArrayLike<number>} arr 已排序的数组
+ * @param {number} el 需查询的元素
+ * @returns 返回元素所在位置，不存在则返回 -1
+ */
+export function binarySearch(arr, el) {
+  let m = 0;
+  let n = arr.length - 1;
+
+  while (m <= n) {
+    // k = Math.floor((n + m) / 2)
+    let k = (n + m) >> 1;
+    let cmp = el - arr[k];
+    if (cmp > 0) {
+      m = k + 1;
+    } else if (cmp < 0) {
+      n = k - 1;
+    } else {
+      return k;
+    }
+  }
+  return -1;
+}
+
+
+/**
+ * @param {number} num 
+ * @param {number} len 
+ */
+export function numToHex(num, len) {
+  return ('00000000' + num.toString(16)).slice(-len)
+}
+
+
+/**
+ * @param {number} ms 
+ */
+export async function sleep(ms) {
+  return new Promise(y => setTimeout(y, ms))
+}
