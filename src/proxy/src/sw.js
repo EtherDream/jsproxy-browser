@@ -1,4 +1,5 @@
 import * as env from './env.js'
+import * as conf from './conf.js'
 import * as urlx from './urlx.js'
 import * as util from './util.js'
 import * as cookie from './cookie.js'
@@ -272,26 +273,26 @@ async function proxy(e, urlObj) {
 }
 
 
-const CDN = 'https://cdn.jsdelivr.net/gh/etherdream/jsproxy-browser@dev/www/assets/'
-
 global.addEventListener('fetch', e => {
   const req = e.request
   const urlStr = req.url
 
-  if (urlStr === env.PATH_ROOT) {
+  // 首页（例如 https://zjcqoo.github.io/）
+  if (urlStr === env.PATH_ROOT || urlStr === env.PATH_HOME) {
     return
   }
 
+  // 注入页面的脚本（例如 https://zjcqoo.github.io/helper.js）
   if (urlStr === env.PATH_HELPER_JS) {
     const ret = fetch(self['__FILE__'])
     e.respondWith(ret)
     return
   }
 
-  // 静态资源
+  // 静态资源（例如 https://zjcqoo.github.io/assets/ico/google.png）
   if (urlStr.startsWith(env.PATH_ASSETS)) {
     const filePath = urlStr.substr(env.PATH_ASSETS.length)
-    const ret = fetch(CDN + filePath)
+    const ret = fetch(conf.CDN_PATH + filePath)
     e.respondWith(ret)
     return
   }

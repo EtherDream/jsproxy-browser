@@ -17,6 +17,7 @@ export function get(obj) {
 
 
 export const PATH_ROOT = getRootPath() 
+export const PATH_HOME = PATH_ROOT + conf.HOME_FILE
 export const PATH_HELPER_JS = PATH_ROOT + 'helper.js'
 export const PATH_ASSETS = PATH_ROOT + 'assets/'
 export const PATH_PREFIX = PATH_ROOT + conf.URL_DELIM
