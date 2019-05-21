@@ -479,7 +479,7 @@ export async function proxyFromCdn(id) {
   const hashHex = util.numToHex(urlHash, 8)
 
   try {
-    const res = await fetch(CDN + '3/' + hashHex + '.txt')
+    const res = await fetch(CDN + '5/' + hashHex + '.txt')
     var buf = await res.arrayBuffer()
   } catch (err) {
     console.warn('[jsproxy] proxyFromCdn fail')

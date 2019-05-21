@@ -1,1 +1,1 @@
-importScripts(__FILE__='https://cdn.jsdelivr.net/gh/etherdream/jsproxy-browser@dev/www/assets/bundle.c052bcbf.js')
+importScripts(__FILE__='https://cdn.jsdelivr.net/gh/etherdream/jsproxy-browser@dev/www/assets/bundle.d71ca91d.js')
