@@ -386,7 +386,7 @@ export function genHttpUrl(urlObj, level) {
     node = selectNodeLine(urlObj, curNode)
   }
 
-  let host = conf.getNodeHost(node)
+  let host = conf.getHostByNodeId(node)
 
   const ssl = (node === 'local') ? '' : 's'
   return `http${ssl}://${host}/http`
@@ -414,7 +414,7 @@ export function genWsUrl(urlObj, args) {
   args['ver__'] = conf.JS_VER
 
   const node = selectNodeLine(urlObj, curNode)
-  const host = conf.getNodeHost(node)
+  const host = conf.getHostByNodeId(node)
 
   const ssl = (curNode === 'local') ? '' : 's'
   return `ws${ssl}://${host}/ws?` + new URLSearchParams(args)
@@ -451,7 +451,8 @@ let gCdnUrlHashList
 
 
 export async function loadManifest() {
-  const res = await fetch(CDN + '4/list.txt')
+  // TODO: 记录每个资源的版本号
+  const res = await fetch(CDN + '5/list.txt')
   const buf = await res.arrayBuffer()
   gCdnUrlHashList = new Uint32Array(buf)
 }
