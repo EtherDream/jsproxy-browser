@@ -29,7 +29,7 @@ function main() {
       return
     }
     var root = location.href.split('-----')[0]
-    sw.register(root + 'x.js')
+    sw.register(root + 'sw.js')
       .then(reload)
       .catch(onfail)
   })

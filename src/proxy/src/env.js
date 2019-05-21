@@ -27,7 +27,7 @@ function getRootPath() {
   // 如果运行在代理页面，当前路径：
   //   https://example.com/path/to/-----url
   // 如果运行在 SW，当前路径：
-  //   https://example.com/path/to/x.js
+  //   https://example.com/path/to/sw.js
   // 如果运行在 Worker，当前路径：
   //   __PATH__
   // 返回：
