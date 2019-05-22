@@ -1,7 +1,7 @@
-export const CDN_PATH = 'https://cdn.jsdelivr.net/gh/etherdream/jsproxy-browser@dev/www/assets/'
+export const CDN_PATH = 'https://cdn.jsdelivr.net/gh/zjcqoo/zjcqoo.github.io@master/assets/'
 export const HOME_FILE = 'index.html'
 export const URL_DELIM = '-----'
-export const JS_VER = '49'
+export const JS_VER = '50'
 //
 // 不走代理的直连资源
 //
