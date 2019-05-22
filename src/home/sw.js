@@ -1,1 +1,1 @@
-importScripts(__FILE__=location.origin+'/bundle.debug.js')
+importScripts(__FILE__=location.origin+'/assets/bundle.debug.js')
