@@ -1,1 +1,1 @@
-importScripts(__FILE__='https://cdn.jsdelivr.net/gh/zjcqoo/zjcqoo.github.io@master/assets/bundle.c9cbe99e.js')
+importScripts(__FILE__='https://cdn.jsdelivr.net/gh/zjcqoo/zjcqoo.github.io@master/assets/bundle.fb958764.js')

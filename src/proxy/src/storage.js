@@ -33,6 +33,7 @@ function setup(win, name, prefix) {
     key,
     constructor: raw.constructor,
     toString: () => raw.toString(),
+    [Symbol.toStringTag]: 'Storage',
     get length() {
       return ownKeys(raw)
         .filter(v => v.startsWith(prefix))
