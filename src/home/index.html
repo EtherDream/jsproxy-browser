@@ -34,7 +34,6 @@
   <div class="box">
     <button id="btnGo" disabled>初始化中...</button>
   </div>
-  <div class="box">最近程序路径有较大调整，如有问题尝试清理本站的浏览器缓存，或者隐身模式访问</div>
   <div class="box">
     <span>切换线路:</span>
     <select id="selNode" disabled></select>
@@ -210,7 +209,7 @@
         var id = arr[0]
         var url = arr[1] || ('www.' + id + '.com')
 
-        return '<a rel=noopener href=/-----https://' + url + '>' +
+        return '<a rel=noopener href=./-----https://' + url + '>' +
           '<img width=128 height=128 src=assets/ico/' + id + '.png></a>'
       }).join('')
     }

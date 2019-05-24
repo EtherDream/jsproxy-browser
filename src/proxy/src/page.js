@@ -189,7 +189,7 @@ export function init(win) {
       break
 
     case MSG.SW_INFO_PUSH:
-      console.log('PAGE MSG.SW_INFO_PUSH:', val)
+      // console.log('PAGE MSG.SW_INFO_PUSH:', val)
       val.cookies.forEach(cookie.set)
       route.setConf(val.conf)
       route.setNode(val.node)
