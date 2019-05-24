@@ -215,7 +215,7 @@
       }).join('')
     }
 
-    function jsproxy_config(conf) {
+    self['jsproxy_config'] = function(conf) {
       initSw()
 
       var nodeMap = conf.node_map
