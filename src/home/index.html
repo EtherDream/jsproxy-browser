@@ -48,21 +48,6 @@
     var sw = navigator.serviceWorker
     var swCtl = null
 
-    var testNodeId = ''
-
-    function parseTestNode() {
-      var m = location.hash.match(/test=([\w.]+)/)
-      if (!m) {
-        return
-      }
-      var ip = m[1]
-      testNodeId = 'test-' + ip.replace(/\./g, '-')
-
-      optTestNode.value = testNodeId
-      optTestNode.text = ip
-      optTestNode.hidden = false
-      optTestNode.selected = true
-    }
 
     function initSw() {
       sw.getRegistration().then(function(reg) {
@@ -90,8 +75,6 @@
       }
       btnGo.disabled = false
       btnGo.textContent = 'Go'
-
-      parseTestNode()
     }
 
     function getRootPath() {
@@ -163,11 +146,7 @@
         onNodeChange(msg)
         break
       case SW_READY:
-        if (testNodeId) {
-          sendMsgToSw(PAGE_NODE_SWITCH, testNodeId)
-        } else {
-          sendMsgToSw(PAGE_NODE_GET)
-        }
+        sendMsgToSw(PAGE_NODE_GET)
         break
       }
     }
