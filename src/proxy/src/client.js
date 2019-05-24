@@ -1,5 +1,5 @@
 import * as urlx from './urlx.js'
-import * as network from './network.js'
+import * as route from './route.js'
 import * as env from './env.js'
 import * as hook from './hook.js'
 import {createFakeLoc} from './fakeloc.js'
@@ -81,7 +81,7 @@ export function init(global, origin) {
         const args = {
           'origin': ori.origin,
         }
-        arguments[0] = network.genWsUrl(urlObj, args)
+        arguments[0] = route.genWsUrl(urlObj, args)
       }
     }
     return construct(oldFn, arguments)

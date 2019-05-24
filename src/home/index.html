@@ -37,25 +37,7 @@
   <div class="box">最近程序路径有较大调整，如有问题尝试清理本站的浏览器缓存，或者隐身模式访问</div>
   <div class="box">
     <span>切换线路:</span>
-    <select id="selNode" disabled>
-      <optgroup label="直连">
-        <option value="aliyun-hk">轻量云-香港</option>
-        <option value="aliyun-sg">轻量云-新加坡</option>
-        <option value="bwh-la">搬瓦工-洛杉矶</option>
-        <option value="justhost-moscow">JustHost-莫斯科</option>
-        <option value="justhost-novosibirsk">JustHost-新西伯利亚</option>
-      </optgroup>
-      <optgroup label="CF 代理">
-        <option value="cf-aliyun-hk">轻量云-香港</option>
-        <option value="cf-aliyun-sg">轻量云-新加坡</option>
-        <option value="cf-bwh-la">搬瓦工-洛杉矶</option>
-        <option value="cf-justhost-moscow">JustHost-莫斯科</option>
-        <option value="cf-justhost-novosibirsk">JustHost-新西伯利亚</option>
-      </optgroup>
-      <optgroup label="测试">
-        <option value="local">localhost</option>
-      </optgroup>
-    </select>
+    <select id="selNode" disabled></select>
   </div>
   <div class="box" id="list">
   </div>
@@ -65,8 +47,36 @@
     var SW_NODE_SWITCHED = 103
     var SW_READY = 200
     var sw = navigator.serviceWorker
-    var swCtl
+    var swCtl = null
 
+    var testNodeId = ''
+
+    function parseTestNode() {
+      var m = location.hash.match(/test=([\w.]+)/)
+      if (!m) {
+        return
+      }
+      var ip = m[1]
+      testNodeId = 'test-' + ip.replace(/\./g, '-')
+
+      optTestNode.value = testNodeId
+      optTestNode.text = ip
+      optTestNode.hidden = false
+      optTestNode.selected = true
+    }
+
+    function initSw() {
+      sw.getRegistration().then(function(reg) {
+      if (reg) {
+        onSwReady()
+        sendMsgToSw(PAGE_NODE_GET)
+      } else {
+        sw.register(getRootPath() + 'sw.js')
+          .then(onSwReady)
+          .catch(onSwFail)
+        }
+      })
+    }
 
     function main() {
       console.log('JsProxy v0.0.9 https://github.com/EtherDream/jsproxy/')
@@ -82,16 +92,7 @@
       btnGo.disabled = false
       btnGo.textContent = 'Go'
 
-      sw.getRegistration().then(function(reg) {
-      if (reg) {
-        onSwReady()
-        sendMsgToSw(PAGE_NODE_GET)
-      } else {
-        sw.register(getRootPath() + 'sw.js')
-          .then(onSwReady)
-          .catch(onSwFail)
-        }
-      })
+      parseTestNode()
     }
 
     function getRootPath() {
@@ -141,32 +142,35 @@
     }
     txtURL.setSelectionRange(0, txtURL.value.length)
 
+    function onNodeChange(id) {
+      var path = '*[value=' + id + ']'
+      var item = selNode.querySelector(path)
+      item.selected = true
+      item.hidden = false
+    }
 
     function onSwReady() {
       setTimeout(showIcons, 100)
       selNode.disabled = false
+      sw.addEventListener('message', onSwMsg)
+    }
 
-      sw.addEventListener('message', function(e) {
-        var data = e.data
-        var cmd = data[0]
-        var msg = data[1]
-        switch (cmd) {
-        case SW_NODE_SWITCHED:
-          selNode
-            .querySelector('*[value=' + msg + ']')
-            .selected = true
-          break
-        case SW_READY:
-          if (location.hash === '#local') {
-            sendMsgToSw(PAGE_NODE_SWITCH, 'local')
-          } else {
-            sendMsgToSw(PAGE_NODE_GET)
-          }
-          // preload
-          new Image().src = 'https://www.google.com/favicon.ico'
-          break
+    function onSwMsg(e) {
+      var data = e.data
+      var cmd = data[0]
+      var msg = data[1]
+      switch (cmd) {
+      case SW_NODE_SWITCHED:
+        onNodeChange(msg)
+        break
+      case SW_READY:
+        if (testNodeId) {
+          sendMsgToSw(PAGE_NODE_SWITCH, testNodeId)
+        } else {
+          sendMsgToSw(PAGE_NODE_GET)
         }
-      })
+        break
+      }
     }
 
     function onSwFail(err) {
@@ -211,7 +215,26 @@
       }).join('')
     }
 
+    function jsproxy_config(conf) {
+      initSw()
+
+      var nodeMap = conf.node_map
+
+      Object.keys(nodeMap).forEach(function(id) {
+        var info = nodeMap[id]
+        if (info.hidden) {
+          return
+        }
+        var optEl = document.createElement('option')
+
+        optEl.text = info.label
+        optEl.value = id
+        selNode.appendChild(optEl)
+      })
+    }
+
     main()
   </script>
+  <script src="conf.js"></script>
 </body>
 </html>

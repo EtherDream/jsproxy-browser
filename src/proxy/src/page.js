@@ -1,4 +1,5 @@
 import * as MSG from './msg.js'
+import * as route from './route.js'
 import * as util from './util.js'
 import * as urlx from './urlx.js'
 import * as hook from './hook.js'
@@ -170,16 +171,14 @@ export function init(win) {
     sendMsgToSw(MSG.PAGE_INIT_BEG, pageId)
 
     // do async init
-    if (win === top) {
-      sendMsgToSw(MSG.PAGE_COOKIE_PULL)
-    } else {
-      sendMsgToSw(MSG.PAGE_INIT_END, pageId)
-    }
+    // if (win === top) {
+      sendMsgToSw(MSG.PAGE_INFO_PULL)
+    // } else {
+    //   readyCallback()
+    // }
   }
   pageAsyncInit()
 
-
-  let hasCookie = false
 
   sw.addEventListener('message', e => {
     const [cmd, val] = e.data
@@ -187,11 +186,18 @@ export function init(win) {
     case MSG.SW_COOKIE_PUSH:
       // console.log('PAGE MSG.SW_COOKIE_PUSH:', val)
       val.forEach(cookie.set)
-      if (!hasCookie) {
-        // MSG.COOKIE_PULL 请求的回应
-        hasCookie = true
-        readyCallback()
-      }
+      break
+
+    case MSG.SW_INFO_PUSH:
+      console.log('PAGE MSG.SW_INFO_PUSH:', val)
+      val.cookies.forEach(cookie.set)
+      route.setConf(val.conf)
+      route.setNode(val.node)
+      readyCallback()
+      break
+
+    case MSG.SW_NODE_SWITCHED:
+      route.setNode(val)
       break
     }
     e.stopImmediatePropagation()

@@ -1,8 +1,11 @@
-import * as conf from './conf.js'
+import * as route from './route.js'
 import * as cookie from './cookie.js'
 import * as urlx from './urlx.js'
 import * as util from './util'
 import * as tld from './tld.js'
+
+
+const conf = self['conf']
 
 const REFER_ORIGIN = location.origin + '/'
 const ENABLE_3RD_COOKIE = true
@@ -16,8 +19,8 @@ const REQ_HDR_ALLOW = new Set('accept,accept-charset,accept-encoding,accept-lang
 // 如果返回所有字段名，长度会很大。
 // 因此请求头中设置 aceh__ 标记，告知服务器是否要返回所有字段名。
 let isAcehOld = true
-
-const directHostSet = new Set(conf.DIRECT_HOST)
+if(self['window'])debugger
+const directHostSet = new Set(conf.direct_hosts)
 
 /**
  * @param {URL} targetUrlObj 
@@ -95,7 +98,7 @@ function getResInfo(res) {
     // =>
     //  key: v1, v2
     //
-    // 对于 set-cookie 单独存储，因为合并会破坏 cookie 格式：
+    // 对于 set-cookie 单独存储，因为合并会破坏 cookie 格式：
     //  var h = new Headers()
     //  h.append('set-cookie', 'hello')
     //  h.append('set-cookie', 'world')
@@ -139,7 +142,7 @@ function getResInfo(res) {
  */
 function initReqHdr(req, urlObj, cliUrlObj) {
   const sysHdr = new Headers({
-    '--ver': conf.JS_VER,
+    '--ver': conf.ver,
     '--url': urlx.delHash(urlObj.href),
     '--mode': req.mode,
     '--type': req.destination || '',
@@ -270,6 +273,8 @@ export async function launch(req, urlObj, cliUrlObj) {
     reqOpt.signal = req.signal
   }
 
+  const urlHash = util.strHash(urlObj.href)
+
   /** @type {Response} */
   let res
 
@@ -277,10 +282,9 @@ export async function launch(req, urlObj, cliUrlObj) {
     // 非 HTTP 协议的资源，直接访问
     // 例如 youtube 引用了 chrome-extension: 协议的脚本
     res = await fetch(req)
-  } else {
-    if (method === 'GET' &&
-        directHostSet.has(urlObj.host)
-    ) {
+  }
+  else if (method === 'GET') {
+    if (directHostSet.has(urlObj.host)) {
       // 支持 cors 的资源
       // 有些服务器配置了 acao: *，直连可加速
       res = await proxyDirect(urlObj, req, reqOpt)
@@ -288,7 +292,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     else {
       // 本地 CDN 加速
       // 一些大网站常用的静态资源存储在 jsdelivr 上
-      const fileID = getCdnFileId(urlObj.href)
+      const fileID = getCdnFileId(urlHash)
       if (fileID !== -1) {
         res = await proxyFromCdn(fileID)
         console.log('cdn hit:', urlObj.href)
@@ -310,7 +314,7 @@ export async function launch(req, urlObj, cliUrlObj) {
   reqOpt.headers = reqHdr
 
   let level = 1
-  let proxyUrl = genHttpUrl(urlObj, level)
+  let proxyUrl = route.genHttpUrl(urlHash, level)
   res = await fetch(proxyUrl, reqOpt)
 
   let resHdr = res.headers
@@ -333,7 +337,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     // TODO: 逻辑优化
     level++
     reqHdr.set('--level', level + '')
-    proxyUrl = genHttpUrl(urlObj, level)
+    proxyUrl = route.genHttpUrl(urlHash, level)
 
     res = await proxyNode2(proxyUrl, reqOpt)
     if (res) {
@@ -343,7 +347,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     // 切换失败，使用原节点
     // TODO: 尝试更多廉价节点，最坏情况才使用原节点
     reqHdr.set('--level', '0')
-    proxyUrl = genHttpUrl(urlObj, 0)
+    proxyUrl = route.genHttpUrl(urlHash, 0)
     res = await fetch(proxyUrl, reqOpt)
   } while (0)
 
@@ -357,89 +361,6 @@ export async function launch(req, urlObj, cliUrlObj) {
   }
 
   return {res, status, headers, cookies}
-}
-
-
-/**
- * @param {URL} urlObj 
- * @param {string} node 
- */
-function selectNodeLine(urlObj, node) {
-  const lines = conf.NODE_MAP[node]
-  if (lines > 1) {
-    const id = util.strHash(urlObj.href) % lines
-    node += ('-' + id)
-  }
-  return node
-}
-
-/**
- * @param {URL} urlObj 
- * @param {number} level 
- */
-export function genHttpUrl(urlObj, level) {
-  let node
-
-  if (level === 2) {
-    node = 'cfworker'
-  } else {
-    node = selectNodeLine(urlObj, curNode)
-  }
-
-  let host = conf.getHostByNodeId(node)
-
-  const ssl = (node === 'local') ? '' : 's'
-  return `http${ssl}://${host}/http`
-}
-
-
-/**
- * @param {URL} urlObj 
- * @param {Object<string, string>} args 
- */
-export function genWsUrl(urlObj, args) {
-  let scheme = 'https'
-  switch (urlObj.protocol) {
-  case 'wss:':
-    break
-  case 'ws:':
-    scheme = 'http'
-    break
-  default:
-    return null
-  }
-
-  const t = urlx.delScheme(urlx.delHash(urlObj.href))
-  args['url__'] = scheme + '://' + t
-  args['ver__'] = conf.JS_VER
-
-  const node = selectNodeLine(urlObj, curNode)
-  const host = conf.getHostByNodeId(node)
-
-  const ssl = (curNode === 'local') ? '' : 's'
-  return `ws${ssl}://${host}/ws?` + new URLSearchParams(args)
-}
-
-
-// TODO: 临时测试
-let curNode = conf.NODE_DEF
-
-
-/**
- * @param {string} node 
- */
-export function switchNode(node) {
-  curNode = node
-  if (! (conf.NODE_MAP[node] > 0)) {
-    return false
-  }
-  console.log('[jsproxy] switchNode:', node)
-  return true
-}
-
-
-export function getNode() {
-  return curNode
 }
 
 
@@ -459,13 +380,12 @@ export async function loadManifest() {
 
 
 /**
- * @param {string} url 
+ * @param {number} urlHash 
  */
-export function getCdnFileId(url) {
+export function getCdnFileId(urlHash) {
   if (!gCdnUrlHashList) {
     return -1
   }
-  const urlHash = util.strHash(url)
   const fileId = util.binarySearch(gCdnUrlHashList, urlHash)
   return fileId
 }

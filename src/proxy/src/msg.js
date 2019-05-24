@@ -1,6 +1,8 @@
-export const PAGE_COOKIE_PULL = 1
-export const PAGE_COOKIE_PUSH = 2
-export const SW_COOKIE_PUSH = 3
+export const PAGE_INFO_PULL = 1
+export const SW_INFO_PUSH = 2
+
+export const PAGE_COOKIE_PUSH = 3
+export const SW_COOKIE_PUSH = 4
 
 export const PAGE_INIT_BEG = 4
 export const PAGE_INIT_END = 5

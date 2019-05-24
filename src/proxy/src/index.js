@@ -23,6 +23,7 @@ function pageEnv(win) {
     // eslint-disable-next-line no-undef
     const page = require('./page.js')
     page.init(win)
+
     console.log('[jsproxy] top page inited')
   } else {
     // 子页面直接调用 top 提供的接口，无需重复初始化
@@ -35,6 +36,13 @@ function pageEnv(win) {
 }
 
 function swEnv() {
+  self['jsproxy_config'] = function(obj) {
+    console.log('[jsproxy] got conf:', obj)
+    self['conf'] = obj
+  }
+  // eslint-disable-next-line no-undef
+  importScripts('conf.js')
+
   // eslint-disable-next-line no-undef
   require('./sw.js')
 }

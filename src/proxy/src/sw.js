@@ -1,5 +1,5 @@
-import * as env from './env.js'
-import * as conf from './conf.js'
+import * as path from './path.js'
+import * as route from './route.js'
 import * as urlx from './urlx.js'
 import * as util from './util.js'
 import * as cookie from './cookie.js'
@@ -8,6 +8,8 @@ import * as MSG from './msg.js'
 import * as jsfilter from './jsfilter.js'
 import * as inject from './inject.js'
 
+
+const conf = self['conf']
 
 const MAX_REDIR = 5
 
@@ -18,6 +20,11 @@ const global = self
 const clients = global.clients
 
 
+/**
+ * @param {*} target 
+ * @param {number} cmd 
+ * @param {*=} val 
+ */
 function sendMsg(target, cmd, val) {
   if (target) {
     target.postMessage([cmd, val])
@@ -273,41 +280,46 @@ async function proxy(e, urlObj) {
 }
 
 
-global.addEventListener('fetch', e => {
+/**
+ * @param {FetchEvent} e 
+ */
+function onFetch(e) {
   const req = e.request
-  const urlStr = req.url
+  const urlStr = urlx.delHash(req.url)
 
   // 首页（例如 https://zjcqoo.github.io/）
-  if (urlStr === env.PATH_ROOT || urlStr === env.PATH_HOME) {
+  if (urlStr === path.ROOT ||
+      urlStr === path.CONF ||
+      urlStr === path.HOME) {
     return
   }
 
   // 注入页面的脚本（例如 https://zjcqoo.github.io/helper.js）
-  if (urlStr === env.PATH_HELPER_JS) {
-    const ret = fetch(self['__FILE__'])
-    e.respondWith(ret)
-    return
+  if (urlStr === path.HELPER) {
+    return fetch(self['__FILE__'])
   }
 
   // 静态资源（例如 https://zjcqoo.github.io/assets/ico/google.png）
-  if (urlStr.startsWith(env.PATH_ASSETS)) {
-    const filePath = urlStr.substr(env.PATH_ASSETS.length)
-    const ret = fetch(conf.CDN_PATH + filePath)
-    e.respondWith(ret)
-    return
+  if (urlStr.startsWith(path.ASSETS)) {
+    const filePath = urlStr.substr(path.ASSETS.length)
+    return fetch(conf.assets_cdn + filePath)
   }
 
   const targetUrlStr = urlx.decUrlStrAbs(urlStr)
   const targetUrlObj = urlx.newUrl(targetUrlStr)
 
   if (targetUrlObj) {
-    const ret = proxy(e, targetUrlObj)
-    e.respondWith(ret)
-    return
+    return proxy(e, targetUrlObj)
   }
+  return makeErrRes('invalid url: ' + targetUrlStr)
+}
 
-  const ret = makeErrRes('invalid url: ' + targetUrlStr)
-  e.respondWith(ret)
+
+global.addEventListener('fetch', e => {
+  const res = onFetch(e)
+  if (res) {
+    e.respondWith(res)
+  }
 })
 
 
@@ -321,15 +333,21 @@ global.addEventListener('message', e => {
     // @ts-ignore
     sendMsgToPages(MSG.SW_COOKIE_PUSH, [val], e.source.id)
     break
-  case MSG.PAGE_COOKIE_PULL:
+
+  case MSG.PAGE_INFO_PULL:
     // console.log('SW MSG.COOKIE_PULL:', e.source.id)
-    sendMsg(e.source, MSG.SW_COOKIE_PUSH, cookie.getNonHttpOnlyItems())
+    sendMsg(e.source, MSG.SW_INFO_PUSH, {
+      cookies: cookie.getNonHttpOnlyItems(),
+      node: route.getNode(),
+      conf: conf,
+    })
     break
 
   case MSG.PAGE_INIT_BEG:
     // console.log('SW MSG.PAGE_INIT_BEG:', val)
     pageNotify(val, false)
     break
+
   case MSG.PAGE_INIT_END:
     // console.log('SW MSG.PAGE_INIT_END:', val)
     pageNotify(val, true)
@@ -346,15 +364,17 @@ global.addEventListener('message', e => {
     break
 
   case MSG.PAGE_NODE_SWITCH:
-    if (network.switchNode(val)) {
+    if (route.hasNode(val)) {
+      route.setNode(val)
       console.log('[jsproxy] node switch to: %s', val)
     } else {
-      console.warn('[jsproxy] invalid node name:', val)
+      console.warn('[jsproxy] invalid node:', val)
     }
     sendMsgToPages(MSG.SW_NODE_SWITCHED, val)
     break
+
   case MSG.PAGE_NODE_GET:
-    sendMsg(e.source, MSG.SW_NODE_SWITCHED, network.getNode())
+    sendMsg(e.source, MSG.SW_NODE_SWITCHED, route.getNode())
     break
   }
 })
@@ -362,7 +382,7 @@ global.addEventListener('message', e => {
 
 global.addEventListener('install', e => {
   console.log('oninstall:', e)
-	global.skipWaiting()
+  global.skipWaiting()
 })
 
 
@@ -371,11 +391,15 @@ let sw
 global.addEventListener('activate', e => {
   clients.claim()
   console.log('onactivate:', e)
+
   sw = global.registration.active
+
+  route.setConf(conf)
+
   sendMsgToPages(MSG.SW_READY, 1)
   sendMsg(sw, MSG.SW_LIFE_ADD)
 
-  // TODO: read
+  // TODO: 
   network.loadManifest()
 })
 

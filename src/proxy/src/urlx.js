@@ -1,7 +1,8 @@
 import * as env from './env.js'
+import * as path from './path.js'
 
 
-const PREFIX = env.PATH_PREFIX
+const PREFIX = path.PREFIX
 const PREFIX_LEN = PREFIX.length
 
 
