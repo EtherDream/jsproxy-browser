@@ -9,7 +9,7 @@ import * as jsfilter from './jsfilter.js'
 import * as inject from './inject.js'
 
 
-const conf = self['conf']
+let conf
 
 const MAX_REDIR = 5
 
@@ -388,19 +388,36 @@ global.addEventListener('install', e => {
 
 let sw
 
+self['jsproxy_config'] = function(obj) {
+  console.log('[jsproxy] got conf:', obj)
+  conf = obj
+  route.setConf(conf)
+  network.setConf(conf)
+}
+
+async function loadConf() {
+  try {
+    const res = await fetch('conf.js')
+    const txt = await res.text()
+    Function(txt)()
+  } catch (err) {
+    console.error('load conf err:', err)
+  }
+}
+
 global.addEventListener('activate', e => {
   clients.claim()
   console.log('onactivate:', e)
 
   sw = global.registration.active
 
-  route.setConf(conf)
-
   sendMsgToPages(MSG.SW_READY, 1)
   sendMsg(sw, MSG.SW_LIFE_ADD)
 
   // TODO: 
   network.loadManifest()
+
+  e.waitUntil(loadConf())
 })
 
 

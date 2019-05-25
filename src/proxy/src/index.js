@@ -36,13 +36,6 @@ function pageEnv(win) {
 }
 
 function swEnv() {
-  self['jsproxy_config'] = function(obj) {
-    console.log('[jsproxy] got conf:', obj)
-    self['conf'] = obj
-  }
-  // eslint-disable-next-line no-undef
-  importScripts('conf.js')
-
   // eslint-disable-next-line no-undef
   require('./sw.js')
 }

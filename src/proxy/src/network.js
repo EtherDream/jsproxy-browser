@@ -5,7 +5,7 @@ import * as util from './util'
 import * as tld from './tld.js'
 
 
-const conf = self['conf']
+let conf
 
 const REFER_ORIGIN = location.origin + '/'
 const ENABLE_3RD_COOKIE = true
@@ -19,8 +19,15 @@ const REQ_HDR_ALLOW = new Set('accept,accept-charset,accept-encoding,accept-lang
 // 如果返回所有字段名，长度会很大。
 // 因此请求头中设置 aceh__ 标记，告知服务器是否要返回所有字段名。
 let isAcehOld = true
-if(self['window'])debugger
-const directHostSet = new Set(conf.direct_hosts)
+
+let directHostSet
+
+
+export function setConf(v) {
+  conf = v
+  directHostSet = new Set(conf.direct_hosts)
+}
+
 
 /**
  * @param {URL} targetUrlObj 
