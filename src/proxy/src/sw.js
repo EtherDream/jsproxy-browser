@@ -403,16 +403,16 @@ async function loadConf() {
   } catch (err) {
     console.error('load conf err:', err)
   }
-}
-
-global.addEventListener('activate', e => {
-  clients.claim()
-  console.log('onactivate:', e)
-
-  sw = global.registration.active
 
   sendMsgToPages(MSG.SW_READY, 1)
   sendMsg(sw, MSG.SW_LIFE_ADD)
+}
+
+global.addEventListener('activate', e => {
+  console.log('onactivate:', e)
+
+  sw = global.registration.active
+  clients.claim()
 
   // TODO: 
   network.loadManifest()
