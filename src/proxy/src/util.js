@@ -77,7 +77,7 @@ export function strHash(str) {
   for (let i = 0, n = str.length; i < n; i++) {
     sum = (sum * 31 + str.charCodeAt(i)) >>> 0
   }
-  return sum;
+  return sum
 }
 
 

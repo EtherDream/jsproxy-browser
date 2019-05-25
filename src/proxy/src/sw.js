@@ -283,15 +283,20 @@ async function proxy(e, urlObj) {
 /**
  * @param {FetchEvent} e 
  */
-function onFetch(e) {
+async function onFetch(e) {
+  if (!conf) {
+    await loadConf()
+  }
   const req = e.request
   const urlStr = urlx.delHash(req.url)
 
-  // 首页（例如 https://zjcqoo.github.io/）
+  // 首页（例如 https://zjcqoo.github.io/index.html）
+  // 配置（例如 https://zjcqoo.github.io/conf.js）
   if (urlStr === path.ROOT ||
-      urlStr === path.CONF ||
-      urlStr === path.HOME) {
-    return
+      urlStr === path.HOME ||
+      urlStr === path.CONF
+  ) {
+    return fetch(urlStr)
   }
 
   // 注入页面的脚本（例如 https://zjcqoo.github.io/helper.js）
@@ -316,10 +321,7 @@ function onFetch(e) {
 
 
 global.addEventListener('fetch', e => {
-  const res = onFetch(e)
-  if (res) {
-    e.respondWith(res)
-  }
+  e.respondWith(onFetch(e))
 })
 
 
@@ -353,16 +355,6 @@ global.addEventListener('message', e => {
     pageNotify(val, true)
     break
 
-  case MSG.SW_LIFE_ADD:
-    // sw life +1s
-    e.waitUntil(new Promise(cb => {
-      setTimeout(_ => {
-        sendMsg(sw, MSG.SW_LIFE_ADD)
-        cb()
-      }, 1000)
-    }))
-    break
-
   case MSG.PAGE_NODE_SWITCH:
     if (route.hasNode(val)) {
       route.setNode(val)
@@ -386,8 +378,6 @@ global.addEventListener('install', e => {
 })
 
 
-let sw
-
 self['jsproxy_config'] = function(obj) {
   console.log('[jsproxy] got conf:', obj)
   conf = obj
@@ -395,29 +385,36 @@ self['jsproxy_config'] = function(obj) {
   network.setConf(conf)
 }
 
-async function loadConf() {
-  try {
-    const res = await fetch('conf.js')
-    const txt = await res.text()
-    Function(txt)()
-  } catch (err) {
-    console.error('load conf err:', err)
-  }
+let initing = false
+let initingQueue = []
 
-  sendMsgToPages(MSG.SW_READY, 1)
-  sendMsg(sw, MSG.SW_LIFE_ADD)
+async function loadConf() {
+  if (initing) {
+    return new Promise(f => {
+      initingQueue.push(f)
+    })
+  }
+  initing = true
+
+  const res = await fetch('conf.js')
+  const txt = await res.text()
+  Function(txt)()
+
+  initingQueue.forEach(f => f())
+
+  try {
+    // TODO: 
+    network.loadManifest()
+  } catch (err) {
+    console.error('loadManifest err:', err)
+  }
 }
 
 global.addEventListener('activate', e => {
   console.log('onactivate:', e)
-
-  sw = global.registration.active
   clients.claim()
 
-  // TODO: 
-  network.loadManifest()
-
-  e.waitUntil(loadConf())
+  sendMsgToPages(MSG.SW_READY, 1)
 })
 
 

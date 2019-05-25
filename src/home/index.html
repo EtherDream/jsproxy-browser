@@ -125,6 +125,9 @@
     txtURL.setSelectionRange(0, txtURL.value.length)
 
     function onNodeChange(id) {
+      if (!id) {
+        return
+      }
       var path = '*[value=' + id + ']'
       var item = selNode.querySelector(path)
       item.selected = true
@@ -207,6 +210,9 @@
 
         optEl.text = info.label
         optEl.value = id
+        if (id === conf.node_default) {
+          optEl.selected = true
+        }
         selNode.appendChild(optEl)
       })
     }
