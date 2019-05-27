@@ -49,20 +49,5 @@ jsproxy_config({
    * 静态资源 CDN 地址
    * 用于加速 `assets` 目录中的资源访问
    */
-  assets_cdn: 'assets/',
-
-  /**
-   * 可直连的主机列表（通常为支持 CORS 的 CDN）
-   * 
-   * 必须满足：
-   *  1.返回头 access-control-allow-origin 为 *
-   *  2.不校验 referer，或者允许为空
-   *  3.不校验 origin
-   * 
-   * 尽量满足：
-   *  1.请求 METHOD 为 GET
-   *  2.请求不产生 preflight
-   */
-  direct_hosts: [
-  ]
+  assets_cdn: 'assets/'
 })
