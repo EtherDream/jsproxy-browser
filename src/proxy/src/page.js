@@ -192,12 +192,11 @@ export function init(win) {
       // console.log('PAGE MSG.SW_INFO_PUSH:', val)
       val.cookies.forEach(cookie.set)
       route.setConf(val.conf)
-      route.setNode(val.node)
       readyCallback()
       break
 
-    case MSG.SW_NODE_SWITCHED:
-      route.setNode(val)
+    case MSG.SW_CONF_CHANGE:
+      route.setConf(val)
       break
     }
     e.stopImmediatePropagation()

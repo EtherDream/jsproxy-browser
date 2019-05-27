@@ -9,14 +9,13 @@ import * as jsfilter from './jsfilter.js'
 import * as inject from './inject.js'
 
 
-let conf
+let gConf
 
 const MAX_REDIR = 5
 
 /** @type {ServiceWorkerGlobalScope} */
 // @ts-ignore
 const global = self
-
 const clients = global.clients
 
 
@@ -284,8 +283,8 @@ async function proxy(e, urlObj) {
  * @param {FetchEvent} e 
  */
 async function onFetch(e) {
-  if (!conf) {
-    await loadConf()
+  if (!gConf) {
+    gConf = await initConf()
   }
   const req = e.request
   const urlStr = urlx.delHash(req.url)
@@ -307,7 +306,7 @@ async function onFetch(e) {
   // 静态资源（例如 https://zjcqoo.github.io/assets/ico/google.png）
   if (urlStr.startsWith(path.ASSETS)) {
     const filePath = urlStr.substr(path.ASSETS.length)
-    return fetch(conf.assets_cdn + filePath)
+    return fetch(gConf.assets_cdn + filePath)
   }
 
   const targetUrlStr = urlx.decUrlStrAbs(urlStr)
@@ -320,6 +319,71 @@ async function onFetch(e) {
 }
 
 
+function updateConf(conf) {
+  route.setConf(conf)
+  network.setConf(conf)
+}
+
+async function fetchConf() {
+  const res = await fetch('conf.js')
+  const txt = await res.text()
+  let ret
+  self['jsproxy_config'] = function(v) {
+    ret = v
+  }
+  Function(txt)()
+  return ret
+}
+
+async function loadConf() {
+  const cache = await caches.open("sys")
+  const req = new Request("/conf.json")
+  const res = await cache.match(req)
+  if (res) {
+    return res.json()
+  }
+}
+
+async function saveConf(conf) {
+  const json = JSON.stringify(conf)
+  const cache = await caches.open("sys")
+  const req = new Request("/conf.json")
+  const res = new Response(json);
+  return cache.put(req, res)
+}
+
+let initing = false
+let initingQueue = []
+
+async function initConf() {
+  if (initing) {
+    return new Promise(f => {
+      initingQueue.push(f)
+    })
+  }
+  initing = true
+
+  let conf
+  try {
+    conf = await loadConf()
+  } catch (err) {
+    console.warn('loadConf fail:', err)
+  }
+  if (!conf) {
+    conf = await fetchConf()
+    console.log('fetchConf:', conf)
+    await saveConf()
+  }
+  updateConf(conf)
+
+  network.loadManifest()
+
+  initing = false
+  initingQueue.forEach(f => f(conf))
+  return conf
+}
+
+
 global.addEventListener('fetch', e => {
   e.respondWith(onFetch(e))
 })
@@ -328,20 +392,20 @@ global.addEventListener('fetch', e => {
 global.addEventListener('message', e => {
   // console.log('sw msg:', e.data)
   const [cmd, val] = e.data
+  const src = e.source
 
   switch (cmd) {
   case MSG.PAGE_COOKIE_PUSH:
     cookie.set(val)
     // @ts-ignore
-    sendMsgToPages(MSG.SW_COOKIE_PUSH, [val], e.source.id)
+    sendMsgToPages(MSG.SW_COOKIE_PUSH, [val], src.id)
     break
 
   case MSG.PAGE_INFO_PULL:
-    // console.log('SW MSG.COOKIE_PULL:', e.source.id)
-    sendMsg(e.source, MSG.SW_INFO_PUSH, {
+    // console.log('SW MSG.COOKIE_PULL:', src.id)
+    sendMsg(src, MSG.SW_INFO_PUSH, {
       cookies: cookie.getNonHttpOnlyItems(),
-      node: route.getNode(),
-      conf: conf,
+      conf: gConf,
     })
     break
 
@@ -355,18 +419,26 @@ global.addEventListener('message', e => {
     pageNotify(val, true)
     break
 
-  case MSG.PAGE_NODE_SWITCH:
-    if (route.hasNode(val)) {
-      route.setNode(val)
-      console.log('[jsproxy] node switch to: %s', val)
+  case MSG.PAGE_CONF_GET:
+    if (gConf) {
+      sendMsg(src, MSG.SW_CONF_RETURN, gConf)
     } else {
-      console.warn('[jsproxy] invalid node:', val)
+      initConf().then(conf => {
+        gConf = conf
+        sendMsg(src, MSG.SW_CONF_RETURN, gConf)
+      })
     }
-    sendMsgToPages(MSG.SW_NODE_SWITCHED, val)
     break
 
-  case MSG.PAGE_NODE_GET:
-    sendMsg(e.source, MSG.SW_NODE_SWITCHED, route.getNode())
+  case MSG.PAGE_CONF_SET:
+    gConf = val
+    saveConf(gConf)
+    updateConf(gConf)
+    sendMsgToPages(MSG.SW_CONF_CHANGE, gConf)
+    break
+
+  case MSG.PAGE_READY_CHECK:
+    sendMsg(src, MSG.SW_READY)
     break
   }
 })
@@ -374,47 +446,15 @@ global.addEventListener('message', e => {
 
 global.addEventListener('install', e => {
   console.log('oninstall:', e)
-  global.skipWaiting()
+  e.waitUntil(global.skipWaiting())
 })
 
 
-self['jsproxy_config'] = function(obj) {
-  console.log('[jsproxy] got conf:', obj)
-  conf = obj
-  route.setConf(conf)
-  network.setConf(conf)
-}
-
-let initing = false
-let initingQueue = []
-
-async function loadConf() {
-  if (initing) {
-    return new Promise(f => {
-      initingQueue.push(f)
-    })
-  }
-  initing = true
-
-  const res = await fetch('conf.js')
-  const txt = await res.text()
-  Function(txt)()
-
-  initingQueue.forEach(f => f())
-
-  try {
-    // TODO: 
-    network.loadManifest()
-  } catch (err) {
-    console.error('loadManifest err:', err)
-  }
-}
-
 global.addEventListener('activate', e => {
   console.log('onactivate:', e)
-  clients.claim()
-
   sendMsgToPages(MSG.SW_READY, 1)
+
+  e.waitUntil(clients.claim())
 })
 
 

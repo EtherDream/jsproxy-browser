@@ -25,7 +25,8 @@ let directHostSet
 
 export function setConf(v) {
   conf = v
-  directHostSet = new Set(conf.direct_hosts)
+  // TODO:
+  directHostSet = new Set([])
 }
 
 

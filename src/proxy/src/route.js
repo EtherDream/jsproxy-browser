@@ -3,7 +3,6 @@ import * as util from './util'
 
 
 let conf
-let curNode = ''
 
 /**
  * @param {number} urlHash 
@@ -20,7 +19,7 @@ function getHostByNodeId(urlHash, id) {
  * @param {number} level 
  */
 export function genHttpUrl(urlHash, level) {
-  let node = curNode
+  let node = conf.node_default
 
   // 实验中...
   if (level === 2) {
@@ -55,30 +54,9 @@ export function genWsUrl(urlObj, args) {
   args['ver__'] = conf.ver
 
   const urlHash = util.strHash(urlObj.href)
-  const host = getHostByNodeId(urlHash, curNode)
+  const host = getHostByNodeId(urlHash, conf.node_default)
 
   return `wss://${host}/ws?` + new URLSearchParams(args)
-}
-
-
-/**
- * @param {string} id 
- */
-export function hasNode(id) {
-  return !!conf.node_map[id]
-}
-
-
-/**
- * @param {string} id 
- */
-export function setNode(id) {
-  curNode = id
-}
-
-
-export function getNode() {
-  return curNode
 }
 
 
@@ -87,5 +65,4 @@ export function getNode() {
  */
 export function setConf(v) {
   conf = v
-  curNode = conf.node_default
 }

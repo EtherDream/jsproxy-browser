@@ -41,29 +41,35 @@
   <div class="box" id="list">
   </div>
   <script>
-    var PAGE_NODE_GET = 100
-    var PAGE_NODE_SWITCH = 102
-    var SW_NODE_SWITCHED = 103
-    var SW_READY = 200
+    var PAGE_CONF_SET = 110
+    var PAGE_CONF_GET = 111
+
+    var SW_CONF_RETURN = 112
+    var SW_CONF_CHANGE = 113
+
+    var PAGE_READY_CHECK = 200
+    var SW_READY = 201
+
     var sw = navigator.serviceWorker
-    var swCtl = null
 
 
     function initSw() {
       sw.getRegistration().then(function(reg) {
-      if (reg) {
-        onSwReady()
-        sendMsgToSw(PAGE_NODE_GET)
-      } else {
-        sw.register(getRootPath() + 'sw.js')
-          .then(onSwReady)
-          .catch(onSwFail)
+        if (reg) {
+          onSwLoaded()
+          return
         }
+        sw.register(getRootPath() + 'sw.js')
+          .then(function(reg) {
+            return sw.ready
+          })
+          .then(onSwLoaded)
+          .catch(onSwFail)
       })
     }
 
     function main() {
-      console.log('JsProxy v0.0.9 https://github.com/EtherDream/jsproxy/')
+      console.log('JsProxy v0.0.10 https://github.com/EtherDream/jsproxy/')
 
       if (!self.isSecureContext) {
         txtURL.value = '本程序需要 HTTPS 站点'
@@ -75,6 +81,8 @@
       }
       btnGo.disabled = false
       btnGo.textContent = 'Go'
+
+      initSw()
     }
 
     function getRootPath() {
@@ -124,20 +132,12 @@
     }
     txtURL.setSelectionRange(0, txtURL.value.length)
 
-    function onNodeChange(id) {
-      if (!id) {
-        return
-      }
-      var path = '*[value=' + id + ']'
-      var item = selNode.querySelector(path)
-      item.selected = true
-      item.hidden = false
-    }
 
-    function onSwReady() {
-      setTimeout(showIcons, 100)
+    function onSwLoaded() {
       selNode.disabled = false
       sw.addEventListener('message', onSwMsg)
+      // TODO:
+      setTimeout(sendMsgToSw, 20, PAGE_READY_CHECK)
     }
 
     function onSwMsg(e) {
@@ -145,11 +145,20 @@
       var cmd = data[0]
       var msg = data[1]
       switch (cmd) {
-      case SW_NODE_SWITCHED:
-        onNodeChange(msg)
+      case SW_CONF_RETURN:
+        conf = msg
+        showConf()
         break
+
+      case SW_CONF_CHANGE:
+        conf = msg
+        updateSelected()
+        break
+
       case SW_READY:
-        sendMsgToSw(PAGE_NODE_GET)
+        console.log('sw ready')
+        showIcons()
+        sendMsgToSw(PAGE_CONF_GET)
         break
       }
     }
@@ -160,7 +169,9 @@
 
     selNode.onchange = function() {
       var item = this.options[this.selectedIndex]
-      sendMsgToSw(PAGE_NODE_SWITCH, item.value)
+      var node = item.value
+      conf.node_default = node
+      sendMsgToSw(PAGE_CONF_SET, conf)
     }
 
     function sendMsgToSw(cmd, val) {
@@ -196,29 +207,53 @@
       }).join('')
     }
 
-    self['jsproxy_config'] = function(conf) {
-      initSw()
+    function addNodeItem(id, text) {
+      var optEl = document.createElement('option')
+      optEl.id = '--' + id
+      optEl.text = text
+      optEl.value = id
+      selNode.appendChild(optEl)
+    }
+
+    function updateSelected() {
+      var id = conf.node_default
+      var item = document.getElementById('--' + id)
+      if (item) {
+        item.selected = true
+      } else {
+        console.warn('unknown node:', id)
+      }
+    }
+
+    function parseTestNode() {
+      var m = location.hash.match(/test=([\w\-.:]+)/)
+      if (!m) {
+        return
+      }
+      var host = m[1]
+      conf.node_map[host] = {
+        label: host,
+        lines: [host]
+      }
+      conf.node_default = host
+      sendMsgToSw(PAGE_CONF_SET, conf)
+    }
+
+    function showConf() {
+      parseTestNode()
 
       var nodeMap = conf.node_map
-
       Object.keys(nodeMap).forEach(function(id) {
         var info = nodeMap[id]
         if (info.hidden) {
           return
         }
-        var optEl = document.createElement('option')
-
-        optEl.text = info.label
-        optEl.value = id
-        if (id === conf.node_default) {
-          optEl.selected = true
-        }
-        selNode.appendChild(optEl)
+        addNodeItem(id, info.label)
       })
+      updateSelected()
     }
 
     main()
   </script>
-  <script src="conf.js"></script>
 </body>
 </html>
