@@ -1,3 +1,3 @@
 webpack \
-  --o "../../src/home/assets/bundle.debug.js" \
+  --o "../../www/assets/bundle.js" \
   --mode development -w

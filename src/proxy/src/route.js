@@ -7,6 +7,7 @@ let conf
 /**
  * @param {number} urlHash 
  * @param {string} id 
+ * @returns {string}
  */
 function getHostByNodeId(urlHash, id) {
   const lines = conf.node_map[id].lines
@@ -27,7 +28,8 @@ export function genHttpUrl(urlHash, level) {
   }
 
   let host = getHostByNodeId(urlHash, node)
-  return `https://${host}/http`
+  const s = /^localhost:?/.test(host) ? '' : 's'
+  return `http${s}://${host}/http`
 }
 
 
@@ -55,8 +57,8 @@ export function genWsUrl(urlObj, args) {
 
   const urlHash = util.strHash(urlObj.href)
   const host = getHostByNodeId(urlHash, conf.node_default)
-
-  return `wss://${host}/ws?` + new URLSearchParams(args)
+  const s = /^localhost:?/.test(host) ? '' : 's'
+  return `ws${s}://${host}/ws?` + new URLSearchParams(args)
 }
 
 

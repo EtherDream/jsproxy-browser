@@ -1,5 +1,5 @@
 DST=../../www/assets
-CDN=https://cdn.jsdelivr.net/gh/zjcqoo/zjcqoo.github.io@master/assets
+CDN=https://cdn.jsdelivr.net/gh/etherdream/jsproxy@gh-pages/assets
 
 rm $DST/bundle.*.js
 

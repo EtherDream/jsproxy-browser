@@ -226,17 +226,15 @@
     }
 
     function parseTestNode() {
-      var m = location.hash.match(/test=([\w\-.:]+)/)
-      if (!m) {
-        return
+      if (location.port === '8443' || location.port === '8080') {
+        var host = location.host
+        conf.node_map[host] = {
+          label: host,
+          lines: [host]
+        }
+        conf.node_default = host
+        sendMsgToSw(PAGE_CONF_SET, conf)
       }
-      var host = m[1]
-      conf.node_map[host] = {
-        label: host,
-        lines: [host]
-      }
-      conf.node_default = host
-      sendMsgToSw(PAGE_CONF_SET, conf)
     }
 
     function showConf() {
