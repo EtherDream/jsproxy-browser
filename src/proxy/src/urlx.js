@@ -1,10 +1,12 @@
+import * as util from './util.js'
 import * as env from './env.js'
 import * as path from './path.js'
+import * as tld from './tld.js'
 
 
 const PREFIX = path.PREFIX
 const PREFIX_LEN = PREFIX.length
-
+const ROOT_LEN = path.ROOT.length
 
 /**
  * @param {string} url 
@@ -148,4 +150,115 @@ export function delHash(url) {
 export function delScheme(url) {
   const p = url.indexOf('://')
   return (p === -1) ? url : url.substr(p + 3)
+}
+
+
+/**
+ * URL 导航调整
+ * 
+ * 标准
+ *  https://example.com/-----https://www.google.com/
+ * 
+ * 无路径
+ *  https://example.com/-----https://www.google.com
+ * 
+ * 无协议
+ *  https://example.com/-----www.google.com
+ * 
+ * 任意数量的分隔符
+ *  https://example.com/---https://www.google.com
+ *  https://example.com/---------https://www.google.com
+ *  https://example.com/https://www.google.com
+ * 
+ * 别名
+ *  https://example.com/google
+ * 
+ * 
+ * 搜索
+ *  https://example.com/-----xxx
+ *  ->
+ *  https://www.google.com/search?q=xxx
+ */
+const DEFAULT_ALIAS = {
+  'www.google.com': ['google', 'gg', 'g'],
+  'www.youtube.com': ['youtube', 'yt', 'y'],
+  'www.wikipedia.org': ['wikipedia', 'wiki', 'wk', 'w'],
+  'www.facebook.com': ['facebook', 'fb', 'f'],
+  'twitter.com': ['twitter', 'tw', 't'],
+}
+
+const DEFAULT_SEARCH = 'https://www.google.com/search?q=%s'
+
+/** @type {Map<string, string>} */
+let aliasDomainMap
+
+/**
+ * @param {string} alias 
+ */
+function getAliasUrl(alias) {
+  if (!aliasDomainMap) {
+    aliasDomainMap = new Map()
+    for (const [domain, aliasArr] of Object.entries(DEFAULT_ALIAS)) {
+      aliasArr.forEach(alias => {
+        aliasDomainMap.set(alias, domain)
+      })
+    }
+  }
+  
+  const domain = aliasDomainMap.get(alias)
+  if (domain) {
+    return 'https://' + domain
+  }
+}
+
+
+/**
+ * @param {string} part 
+ */
+function padUrl(part) {
+  // TODO: HSTS
+  const urlStr = isHttpProto(part) ? part : `http://${part}`
+  const urlObj = newUrl(urlStr)
+  if (!urlObj) {
+    return
+  }
+  const {hostname} = urlObj
+
+  // 数字会被当做 IP 地址:
+  // new URL('http://1024').href == 'http://0.0.4.0'
+  // 这种情况应该搜索，而不是访问
+  // 只有出现完整的 IP 才访问
+  if (util.isIPv4(hostname) && !urlStr.includes(hostname)) {
+    return
+  }
+
+  if (urlObj && tld.getTld(hostname)) {
+    return urlObj.href
+  }
+}
+
+
+/**
+ * @param {string} urlStr
+ */
+export function adjustNav(urlStr) {
+  // 分隔符 `-----` 之后的部分
+  const rawUrlStr = urlStr.substr(PREFIX_LEN)
+  const rawUrlObj = newUrl(rawUrlStr)
+
+  // likely case
+  if (rawUrlObj && PREFIX + rawUrlObj.href === urlStr) {
+    return
+  }
+
+  // 任意数量 `-` 之后的部分
+  const part = urlStr.substr(ROOT_LEN).replace(/^-*/, '')
+
+  const ret = getAliasUrl(part) || padUrl(part)
+  if (ret) {
+    return PREFIX + ret
+  }
+
+  const arg = part.replace(/&/g, '%26')
+  return PREFIX + DEFAULT_SEARCH.replace('%s', arg)
 }

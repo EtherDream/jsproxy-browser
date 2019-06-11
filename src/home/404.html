@@ -1,39 +1,64 @@
-<body id="t">loading...
-<script>
-function reload() {
-  var curr = Date.now()
-  try {
-    var last = +sessionStorage._ts || 0
-    if (curr - last < 100) {
-      return setTimeout(reload, 2000)
+<!--
+  该页面用于安装 Service Worker
+  用户首次访问时，无论请求哪个资源（包括首页），都返回该页面
+  该页面尽可能精简，兼容所有浏览器
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+</head>
+<body id="t">
+  <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid" fill="none"><circle cx="50" cy="50" r="25.944" stroke="#93dbe9"><animate attributeName="r" calcMode="spline" values="0;40" keyTimes="0;1" dur="1" keySplines="0 0.2 0.8 1" begin="-0.5s" repeatCount="indefinite" stroke-width="2"/><animate attributeName="opacity" calcMode="spline" values="1;0" keyTimes="0;1" dur="1" keySplines="0.2 0 0.8 1" begin="-0.5s" repeatCount="indefinite" stroke-width="2"/></circle><circle cx="50" cy="50" r="40" stroke="#689cc5"><animate attributeName="r" calcMode="spline" values="0;40" keyTimes="0;1" dur="1" keySplines="0 0.2 0.8 1" begin="0s" repeatCount="indefinite" stroke-width="2"/><animate attributeName="opacity" calcMode="spline" values="1;0" keyTimes="0;1" dur="1" keySplines="0.2 0 0.8 1" begin="0s" repeatCount="indefinite" stroke-width="2"/></circle></svg>
+  <script>
+  function reload() {
+    // 设置最小刷新间隔，防止出错时不停刷新
+    var curr = Date.now()
+    try {
+      var last = +sessionStorage._ts || 0
+      if (curr - last < 100) {
+        return setTimeout(reload, 10000)
+      }
+      sessionStorage._ts = curr
+    } catch (err) {
     }
-    sessionStorage._ts = curr
-  } catch (err) {
+    location.reload()
   }
-  location.reload()
-}
 
-function onfail(err) {
-  t.innerHTML = err.message
-}
-
-function main() {
-  var sw = navigator.serviceWorker
-  if (!sw || !self.ReadableStream) {
-    t.innerHTML = '请使用最新版 Chrome 浏览器访问'
-    return
+  function onfail(err) {
+    showErr(err.message)
   }
-  sw.getRegistration().then(function(reg) {
-    if (reg) {
-      reload()
+
+  function showErr(str) {
+    t.innerHTML = str
+  }
+
+  function getRootPath() {
+    // https://a.com/ -> /
+    // https://a.com/index.html -> /
+    // https://a.com/path/to/ -> /path/to/
+    // https://a.com/path/to -> /path/to/
+    // https://a.com/path/to/index.html -> /path/to/
+    return location.pathname
+      .replace(/\w+\.\w+$/, '')
+      .replace(/\/*$/, '/')
+  }
+
+  function main() {
+    if (!self.isSecureContext) {
+      showErr('本程序需要 HTTPS 站点')
       return
     }
-    var root = location.href.split('-----')[0]
-    sw.register(root + 'sw.js')
+    var sw = navigator.serviceWorker
+    if (!sw || !self.ReadableStream) {
+      showErr('请使用最新版 Chrome 浏览器访问')
+      return
+    }
+    sw
+      .register(getRootPath() + 'sw.js')
       .then(reload)
       .catch(onfail)
-  })
-}
-main()
-</script>
+  }
+  main()
+  </script>
 </body>
+</html>

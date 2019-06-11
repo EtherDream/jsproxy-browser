@@ -1,5 +1,6 @@
-curl -o /tmp/list.dat https://publicsuffix.org/list/effective_tld_names.dat
+ofile=$(mktemp)
+curl https://publicsuffix.org/list/effective_tld_names.dat > $ofile
 
-node gen.js > ../src/tld-data.js
+node gen.js $ofile > ../src/tld-data.js
 
 echo "done"

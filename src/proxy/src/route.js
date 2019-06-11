@@ -16,6 +16,14 @@ function getHostByNodeId(urlHash, id) {
 
 
 /**
+ * @param {string} host 
+ */
+function isLocalhost(host) {
+  return /^(localhost|127\.\d+\.\d+\.\d+)([:/]|$)/.test(host)
+}
+
+
+/**
  * @param {number} urlHash 
  * @param {number} level 
  */
@@ -28,7 +36,7 @@ export function genHttpUrl(urlHash, level) {
   }
 
   let host = getHostByNodeId(urlHash, node)
-  const s = /^localhost:?/.test(host) ? '' : 's'
+  const s = isLocalhost(host) ? '' : 's'
   return `http${s}://${host}/http`
 }
 
@@ -57,7 +65,7 @@ export function genWsUrl(urlObj, args) {
 
   const urlHash = util.strHash(urlObj.href)
   const host = getHostByNodeId(urlHash, conf.node_default)
-  const s = /^localhost:?/.test(host) ? '' : 's'
+  const s = isLocalhost(host) ? '' : 's'
   return `ws${s}://${host}/ws?` + new URLSearchParams(args)
 }
 

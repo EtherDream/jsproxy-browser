@@ -289,24 +289,32 @@ async function onFetch(e) {
   const req = e.request
   const urlStr = urlx.delHash(req.url)
 
-  // 首页（例如 https://zjcqoo.github.io/index.html）
+  // 首页（例如 https://zjcqoo.github.io/）
+  if (urlStr === path.ROOT || urlStr === path.HOME) {
+    return fetch(gConf.assets_cdn + 'index.html')
+  }
+
   // 配置（例如 https://zjcqoo.github.io/conf.js）
-  if (urlStr === path.ROOT ||
-      urlStr === path.HOME ||
-      urlStr === path.CONF
-  ) {
+  if (urlStr === path.CONF) {
     return fetch(urlStr)
   }
 
-  // 注入页面的脚本（例如 https://zjcqoo.github.io/helper.js）
+  // 注入页面的脚本（例如 https://zjcqoo.github.io/__sys__/helper.js）
   if (urlStr === path.HELPER) {
     return fetch(self['__FILE__'])
   }
 
-  // 静态资源（例如 https://zjcqoo.github.io/assets/ico/google.png）
+  // 静态资源（例如 https://zjcqoo.github.io/__sys__/assets/ico/google.png）
   if (urlStr.startsWith(path.ASSETS)) {
     const filePath = urlStr.substr(path.ASSETS.length)
     return fetch(gConf.assets_cdn + filePath)
+  }
+
+  if (req.mode === 'navigate') {
+    const newUrl = urlx.adjustNav(urlStr)
+    if (newUrl) {
+      return Response.redirect(newUrl, 301)
+    }
   }
 
   const targetUrlStr = urlx.decUrlStrAbs(urlStr)

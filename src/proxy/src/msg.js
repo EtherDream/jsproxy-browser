@@ -15,5 +15,3 @@ export const SW_CONF_CHANGE = 113
 
 export const PAGE_READY_CHECK = 200
 export const SW_READY = 201
-
-export const SW_LIFE_ADD = 201

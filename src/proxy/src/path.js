@@ -2,8 +2,8 @@
 export const ROOT = getRootPath() 
 export const HOME = ROOT + 'index.html'
 export const CONF = ROOT + 'conf.js'
-export const HELPER = ROOT + 'helper.js'
-export const ASSETS = ROOT + 'assets/'
+export const HELPER = ROOT + '__sys__/helper.js'
+export const ASSETS = ROOT + '__sys__/assets/'
 export const PREFIX = ROOT + '-----'
 
 
@@ -18,6 +18,7 @@ function getRootPath() {
   // 返回：
   //   https://example.com/path/to/
   //
+  /** @type {string} */
   const envPath = self['__PATH__']
   if (envPath) {
     return envPath

@@ -1,3 +1,4 @@
+// https://publicsuffix.org/list/effective_tld_names.dat
 import tldData from './tld-data.js'
 import {isIPv4} from './util.js'
 
@@ -6,32 +7,44 @@ import {isIPv4} from './util.js'
 const tldCache = new Map()
 const tldSet = new Set(tldData.split(','))
 
+/**
+ * @param {string} domain 
+ */
+function getDomainTld(domain) {
+  if (isTld(domain)) {
+    return domain
+  }
+  let pos = 0
+  for (;;) {
+    // a.b.c -> b.c
+    pos = domain.indexOf('.', pos + 1)
+    if (pos === -1) {
+      return ''
+    }
+    const str = domain.substr(pos + 1)
+    if (isTld(str)) {
+      return str
+    }
+  }
+}
 
 /**
  * @param {string} domain 
  */
 export function getTld(domain) {
   let ret = tldCache.get(domain)
-  if (ret) {
+  if (ret !== undefined) {
     return ret
   }
-  if (!isIPv4(domain) && !isTld(domain)) {
-    let pos = 0
-    for (;;) {
-      // a.b.c -> b.c
-      pos = domain.indexOf('.', pos + 1)
-      if (pos === -1) {
-        break
-      }
-      const str = domain.substr(pos + 1)
-      if (isTld(str)) {
-        domain = str
-        break
-      }
-    }
+
+  if (isIPv4(domain)) {
+    ret = domain
+  } else {
+    ret = getDomainTld(domain)
   }
+
   tldCache.set(domain, ret)
-  return domain
+  return ret
 }
 
 
