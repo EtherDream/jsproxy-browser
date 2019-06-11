@@ -15,10 +15,10 @@
     var curr = Date.now()
     try {
       var last = +sessionStorage._ts || 0
-      if (curr - last < 100) {
-        return setTimeout(reload, 10000)
-      }
       sessionStorage._ts = curr
+      if (curr - last < 100) {
+        return setTimeout(reload, 5000)
+      }
     } catch (err) {
     }
     location.reload()

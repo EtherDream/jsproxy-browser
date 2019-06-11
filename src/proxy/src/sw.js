@@ -291,7 +291,12 @@ async function onFetch(e) {
 
   // 首页（例如 https://zjcqoo.github.io/）
   if (urlStr === path.ROOT || urlStr === path.HOME) {
-    return fetch(gConf.assets_cdn + 'index.html')
+    const res = await fetch(gConf.assets_cdn + 'index_v2.html')
+    return new Response(res.body, {
+      headers: {
+        'content-type': 'text/html',
+      }
+    })
   }
 
   // 配置（例如 https://zjcqoo.github.io/conf.js）
