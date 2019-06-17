@@ -1,1 +1,1 @@
-importScripts(__FILE__='https://cdn.jsdelivr.net/gh/zjcqoo/zjcqoo.github.io@master/assets/bundle.e325af85.js')
+jsproxy_config=x=>importScripts(__FILE__=x.assets_cdn+'bundle.e325af85.js');importScripts('conf.js')

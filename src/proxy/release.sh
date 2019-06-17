@@ -1,5 +1,4 @@
 DST=../../www/assets
-CDN=https://cdn.jsdelivr.net/gh/zjcqoo/zjcqoo.github.io@master/assets
 
 rm $DST/bundle.*.js
 
@@ -9,6 +8,10 @@ webpack \
 
 cd $DST
 
-for i in bundle.*.js ; do
-  printf "importScripts(__FILE__='$CDN/$i')" > ../sw.js
+for i in bundle.*.js; do
+  printf "\
+jsproxy_config=\
+x=>importScripts(__FILE__=x.assets_cdn+'$i');\
+importScripts('conf.js')\
+" > ../sw.js
 done
