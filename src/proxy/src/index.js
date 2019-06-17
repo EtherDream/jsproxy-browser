@@ -1,6 +1,9 @@
-// 使用 require 动态引用，而不是 import 静态引用
+import * as env from "./env";
+
 
 function pageEnv(win) {
+  env.setEnvType(env.ENV_PAGE)
+
   if (win === top) {
     // 开放一个接口，可供 iframe 调用
     win.__init__ = function(win) {
@@ -36,11 +39,14 @@ function pageEnv(win) {
 }
 
 function swEnv() {
+  env.setEnvType(env.ENV_SW)
   // eslint-disable-next-line no-undef
   require('./sw.js')
 }
 
 function workerEnv(global) {
+  env.setEnvType(env.ENV_WORKER)
+
   // eslint-disable-next-line no-undef
   require('./client.js').init(global, location.origin)
   global.__set_srcWin = function() {

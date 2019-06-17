@@ -50,8 +50,8 @@ export function encUrlObj(urlObj) {
   return PREFIX + fullUrl
 }
 
-
-const IS_WORKER = !self.window
+const IS_SW = env.isEnvSw()
+const IS_WORKER = env.isEnvWorker()
 const WORKER_URL = IS_WORKER && decUrlStrAbs(location.href)
 
 /**
@@ -61,7 +61,9 @@ const WORKER_URL = IS_WORKER && decUrlStrAbs(location.href)
 export function encUrlStrRel(url, relObj) {
   let baseUrl
 
-  if (IS_WORKER) {
+  if (IS_SW) {
+    baseUrl = relObj
+  } else if (IS_WORKER) {
     baseUrl = WORKER_URL
   } else {
     const {doc} = env.get(relObj)
@@ -156,9 +158,9 @@ export function delScheme(url) {
 /**
  * @param {string} val 
  */
-export function replaceHttpRefresh(val) {
+export function replaceHttpRefresh(val, relObj) {
   return val.replace(/(;\s*url=)(.+)/i, (_, $1, url) => {
-    return $1 + encUrlStrRel(url, this)
+    return $1 + encUrlStrRel(url, relObj)
   })
 }
 

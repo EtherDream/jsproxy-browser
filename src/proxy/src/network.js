@@ -134,20 +134,12 @@ function getResInfo(res) {
       return
     }
 
-    switch (key) {
     // 删除 vary 字段的 --url
-    case 'vary':
+    if (key === 'vary') {
       if (val === '--url') {
         return
       }
       val = val.replace('--url,', '')
-      break
-
-    // 处理 HTTP 返回头的 refresh 字段
-    // http://www.otsukare.info/2015/03/26/refresh-http-header
-    case 'refresh':
-      val = urlx.replaceHttpRefresh(val)
-      break
     }
 
     headers.set(key, val)
@@ -376,6 +368,18 @@ export async function launch(req, urlObj, cliUrlObj) {
   const {
     status, headers, cookieStrArr
   } = getResInfo(res)
+
+
+  // 处理 HTTP 返回头的 refresh 字段
+  // http://www.otsukare.info/2015/03/26/refresh-http-header
+  const refresh = headers.get('refresh')
+  if (refresh) {
+    const newVal = urlx.replaceHttpRefresh(refresh, urlObj.href)
+    if (newVal !== refresh) {
+      console.log('[jsproxy] http refresh:', refresh)
+      headers.set('refresh', newVal)
+    }
+  }
 
   let cookies
   if (cookieStrArr.length) {

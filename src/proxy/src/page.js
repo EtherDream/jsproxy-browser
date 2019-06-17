@@ -389,7 +389,7 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
 
       switch (val.toLowerCase()) {
       case 'refresh':
-        newVal = urlx.replaceHttpRefresh(this.content)
+        newVal = urlx.replaceHttpRefresh(this.content, this)
         if (newVal !== val) {
           console.warn('[jsproxy] meta redir')
           this.content = newVal
