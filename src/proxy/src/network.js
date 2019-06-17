@@ -128,12 +128,26 @@ function getResInfo(res) {
       key = key.substr(2)
     }
 
+    // 单个 set-cookie 返回头
+    if (key === 'set-cookie') {
+      cookieStrArr.push(val)
+      return
+    }
+
+    switch (key) {
     // 删除 vary 字段的 --url
-    if (key === 'vary') {
+    case 'vary':
       if (val === '--url') {
         return
       }
       val = val.replace('--url,', '')
+      break
+
+    // 处理 HTTP 返回头的 refresh 字段
+    // http://www.otsukare.info/2015/03/26/refresh-http-header
+    case 'refresh':
+      val = urlx.replaceHttpRefresh(val)
+      break
     }
 
     headers.set(key, val)

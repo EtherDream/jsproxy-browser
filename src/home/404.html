@@ -39,6 +39,7 @@
     // https://a.com/path/to -> /path/to/
     // https://a.com/path/to/index.html -> /path/to/
     return location.pathname
+      .replace(/\/-+https?:.+/, '')
       .replace(/\w+\.\w+$/, '')
       .replace(/\/*$/, '/')
   }

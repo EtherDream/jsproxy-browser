@@ -154,6 +154,16 @@ export function delScheme(url) {
 
 
 /**
+ * @param {string} val 
+ */
+export function replaceHttpRefresh(val) {
+  return val.replace(/(;\s*url=)(.+)/i, (_, $1, url) => {
+    return $1 + encUrlStrRel(url, this)
+  })
+}
+
+
+/**
  * URL 导航调整
  * 
  * 标准
@@ -207,7 +217,7 @@ function getAliasUrl(alias) {
   
   const domain = aliasDomainMap.get(alias)
   if (domain) {
-    return 'https://' + domain
+    return 'https://' + domain + '/'
   }
 }
 
@@ -247,7 +257,10 @@ export function adjustNav(urlStr) {
   const rawUrlObj = newUrl(rawUrlStr)
 
   // likely case
-  if (rawUrlObj && PREFIX + rawUrlObj.href === urlStr) {
+  if (rawUrlObj &&
+      isHttpProto(rawUrlObj.protocol) &&
+      PREFIX + rawUrlObj.href === urlStr
+  ) {
     return
   }
 

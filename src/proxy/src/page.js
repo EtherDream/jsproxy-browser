@@ -385,12 +385,15 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
       return val
     },
     onset(val) {
+      let newVal
+
       switch (val.toLowerCase()) {
       case 'refresh':
-        this.content = this.content.replace(/(;url=)(.+)/i, (_, $1, url) => {
-          console.warn('[jsproxy] meta redir:', url)
-          return $1 + urlx.encUrlStrRel(url, this)
-        })
+        newVal = urlx.replaceHttpRefresh(this.content)
+        if (newVal !== val) {
+          console.warn('[jsproxy] meta redir')
+          this.content = newVal
+        }
         break
       case 'content-security-policy':
         console.warn('[jsproxy] meta csp removed')
