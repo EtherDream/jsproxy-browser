@@ -182,6 +182,9 @@ export function replaceHttpRefresh(val, relObj) {
  *  https://example.com/---------https://www.google.com
  *  https://example.com/https://www.google.com
  * 
+ * 重复
+ *  https://example.com/-----https://example.com/-----https://www.google.com
+ * 
  * 别名
  *  https://example.com/google
  * 
@@ -236,6 +239,16 @@ function padUrl(part) {
   }
   const {hostname} = urlObj
 
+  // http://localhost
+  if (!hostname.includes('.')) {
+    return
+  }
+
+  // http://a.b
+  if (!tld.getTld(hostname)) {
+    return
+  }
+
   // 数字会被当做 IP 地址:
   // new URL('http://1024').href == 'http://0.0.4.0'
   // 这种情况应该搜索，而不是访问
@@ -244,9 +257,7 @@ function padUrl(part) {
     return
   }
 
-  if (urlObj && tld.getTld(hostname)) {
-    return urlObj.href
-  }
+  return urlObj.href
 }
 
 
@@ -258,12 +269,18 @@ export function adjustNav(urlStr) {
   const rawUrlStr = urlStr.substr(PREFIX_LEN)
   const rawUrlObj = newUrl(rawUrlStr)
 
-  // likely case
-  if (rawUrlObj &&
-      isHttpProto(rawUrlObj.protocol) &&
-      PREFIX + rawUrlObj.href === urlStr
-  ) {
-    return
+  if (rawUrlObj) {
+    // 循环引用
+    const m = rawUrlStr.match(/\/-----(https?:\/\/.+)$/)
+    if (m) {
+      return PREFIX + m[1]
+    }
+    // 标准格式（大概率）
+    if (isHttpProto(rawUrlObj.protocol) &&
+        PREFIX + rawUrlObj.href === urlStr
+    ) {
+      return
+    }
   }
 
   // 任意数量 `-` 之后的部分

@@ -60,8 +60,7 @@
       const text = txtURL.value.trim()
       if (text) {
         const url = './-----' + text
-        const win = open(url)
-        win.opener = null
+        open(url, '_blank', 'noopener,noreferrer')
       }
     }
     txtURL.onkeypress = function(e) {
@@ -133,7 +132,7 @@
         let [id, url] = v
         url = url || `www.${id}.com/`
         return `\
-<a rel=noopener href=./-----https://${url}>\
+<a rel="noopener noreferrer" href=./-----https://${url}>\
 <img width=128 height=128 src=__sys__/assets/ico/${id}.png></a>`
       }).join('')
     }

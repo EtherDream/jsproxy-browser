@@ -291,7 +291,7 @@ async function onFetch(e) {
 
   // 首页（例如 https://zjcqoo.github.io/）
   if (urlStr === path.ROOT || urlStr === path.HOME) {
-    const res = await fetch(gConf.assets_cdn + 'index_v2.html')
+    const res = await fetch(gConf.assets_cdn + 'index_v3.html')
     return new Response(res.body, {
       headers: {
         'content-type': 'text/html',
@@ -333,6 +333,7 @@ async function onFetch(e) {
 
 
 function updateConf(conf) {
+  inject.setConf(conf)
   route.setConf(conf)
   network.setConf(conf)
 }

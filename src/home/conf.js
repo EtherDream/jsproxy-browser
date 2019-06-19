@@ -49,5 +49,7 @@ jsproxy_config({
    * 静态资源 CDN 地址
    * 用于加速 `assets` 目录中的资源访问
    */
-  assets_cdn: 'assets/'
+  assets_cdn: 'assets/',
+
+  inject_html: '<!-- custom html -->'
 })

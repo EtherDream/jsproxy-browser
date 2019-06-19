@@ -1,7 +1,8 @@
 import * as path from './path.js'
-import * as util from "./util";
+import * as util from "./util"
 // import * as jsfilter from './jsfilter.js'
 
+let conf
 
 
 const WORKER_INJECT = util.strToBytes(`\
@@ -14,6 +15,11 @@ if (typeof importScripts === 'function' && !self.window && !self.__PATH__) {
 
 export function getWorkerCode() {
   return WORKER_INJECT
+}
+
+
+export function setConf(v) {
+  conf = v
 }
 
 
@@ -36,6 +42,7 @@ chrome-extension-resource: \
  */
 export function getHtmlCode(urlObj, pageId) {
   const icoUrl = path.PREFIX + urlObj.origin + '/favicon.ico'
+  const custom = conf.inject_html || ''
 
   return util.strToBytes(`\
 <!-- JS PROXY HELPER -->
@@ -44,7 +51,7 @@ export function getHtmlCode(urlObj, pageId) {
 <meta http-equiv="content-security-policy" content="frame-src ${CSP}; object-src ${CSP}">
 <base href="${urlObj.href}">
 <script data-id="${pageId}" src="${path.HELPER}"></script>
-<!-- https://github.com/EtherDream/jsproxy -->
+${custom}
 <!-- PADDING ${PADDING} -->
 
 `)
