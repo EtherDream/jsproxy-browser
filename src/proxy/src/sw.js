@@ -18,6 +18,8 @@ const MAX_REDIR = 5
 const global = self
 const clients = global.clients
 
+let gUrlHandler
+
 
 /**
  * @param {*} target 
@@ -80,9 +82,12 @@ function pageNotify(id, isDone) {
 }
 
 
-function makeErrRes(desc) {
-  return new Response(desc, {
-    status: 500
+function makeHtmlRes(body, status = 200) {
+  return new Response(body, {
+    status,
+    headers: {
+      'content-type': 'text/html',
+    }
   })
 }
 
@@ -215,7 +220,7 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
       // 跟随模式，返回最终数据
       if (req.redirect === 'follow') {
         if (++redirNum === MAX_REDIR) {
-          return makeErrRes('too many redirects')
+          return makeHtmlRes('too many redirects', 500)
         }
         return forward(req, locObj, cliUrlObj, redirNum)
       }
@@ -274,7 +279,7 @@ async function proxy(e, urlObj) {
     return await forward(e.request, urlObj, cliUrlObj, 0)
   } catch (err) {
     console.error(err)
-    return makeErrRes(err.stack)
+    return makeHtmlRes(err.stack, 500)
   }
 }
 
@@ -292,11 +297,7 @@ async function onFetch(e) {
   // 首页（例如 https://zjcqoo.github.io/）
   if (urlStr === path.ROOT || urlStr === path.HOME) {
     const res = await fetch(gConf.assets_cdn + 'index_v3.html')
-    return new Response(res.body, {
-      headers: {
-        'content-type': 'text/html',
-      }
-    })
+    return makeHtmlRes(res.body)
   }
 
   // 配置（例如 https://zjcqoo.github.io/conf.js）
@@ -322,13 +323,47 @@ async function onFetch(e) {
     }
   }
 
-  const targetUrlStr = urlx.decUrlStrAbs(urlStr)
+  let targetUrlStr = urlx.decUrlStrAbs(urlStr)
+  
+  const handler = gUrlHandler[targetUrlStr]
+  if (handler) {
+    const {
+      redir,
+      content,
+      replace,
+    } = handler
+
+    if (redir) {
+      return Response.redirect('/-----' + redir)
+    }
+    if (content) {
+      return makeHtmlRes(content)
+    }
+    if (replace) {
+      targetUrlStr = replace
+    }
+  }
+
   const targetUrlObj = urlx.newUrl(targetUrlStr)
 
   if (targetUrlObj) {
     return proxy(e, targetUrlObj)
   }
-  return makeErrRes('invalid url: ' + targetUrlStr)
+  return makeHtmlRes('invalid url: ' + targetUrlStr, 500)
+}
+
+
+function parseUrlHandler(handler) {
+  const map = {}
+  if (!handler) {
+    return map
+  }
+  for (const [match, rule] of Object.entries(handler)) {
+    // TODO: 支持通配符和正则
+    map[match] = rule
+  }
+console.log(map)
+  return map
 }
 
 
@@ -336,6 +371,8 @@ function updateConf(conf) {
   inject.setConf(conf)
   route.setConf(conf)
   network.setConf(conf)
+
+  gUrlHandler = parseUrlHandler(conf.url_handler)
 }
 
 async function fetchConf() {
