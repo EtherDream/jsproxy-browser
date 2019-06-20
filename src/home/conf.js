@@ -51,5 +51,8 @@ jsproxy_config({
    */
   assets_cdn: 'assets/',
 
+  /**
+   * 自定义注入页面的 HTML
+   */
   inject_html: '<!-- custom html -->'
 })

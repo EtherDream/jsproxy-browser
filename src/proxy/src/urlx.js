@@ -291,6 +291,8 @@ export function adjustNav(urlStr) {
     return PREFIX + ret
   }
 
-  const arg = part.replace(/&/g, '%26')
-  return PREFIX + DEFAULT_SEARCH.replace('%s', arg)
+  const keyword = part
+    .replace(/%/g, '%25')
+    .replace(/&/g, '%26')
+  return PREFIX + DEFAULT_SEARCH.replace('%s', keyword)
 }
