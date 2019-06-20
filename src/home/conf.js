@@ -9,7 +9,8 @@ jsproxy_config({
       lines: [
         // 多条线路，负载均衡会从其中选一条
         'node-aliyun-hk-0.etherdream.com:8443',
-        'node-aliyun-hk-1.etherdream.com:8443'
+        'node-aliyun-hk-1.etherdream.com:8443',
+        'node-aliyun-hk-2.etherdream.com:8443',
       ]
     },
     'aliyun-sg': {

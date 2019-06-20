@@ -1,3 +1,4 @@
 ._*
 node_modules
 src/home/bundle.debug.js
+www/assets/bundle.*.js
