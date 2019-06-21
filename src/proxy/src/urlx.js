@@ -50,8 +50,8 @@ export function encUrlObj(urlObj) {
   return PREFIX + fullUrl
 }
 
-const IS_SW = env.isEnvSw()
-const IS_WORKER = env.isEnvWorker()
+const IS_SW = env.isSwEnv()
+const IS_WORKER = env.isWorkerEnv()
 const WORKER_URL = IS_WORKER && decUrlStrAbs(location.href)
 
 /**
@@ -291,8 +291,6 @@ export function adjustNav(urlStr) {
     return PREFIX + ret
   }
 
-  const keyword = part
-    .replace(/%/g, '%25')
-    .replace(/&/g, '%26')
+  const keyword = part.replace(/&/g, '%26')
   return PREFIX + DEFAULT_SEARCH.replace('%s', keyword)
 }

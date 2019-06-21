@@ -2,18 +2,18 @@ export const ENV_PAGE = 1
 export const ENV_WORKER = 2
 export const ENV_SW = 3
 
-let envType = 0
+let mEnvType = 0
 
 export function setEnvType(v) {
-  envType = v
+  mEnvType = v
 }
 
-export function isEnvSw() {
-  return envType === ENV_SW
+export function isSwEnv() {
+  return mEnvType === ENV_SW
 }
 
-export function isEnvWorker() {
-  return envType === ENV_WORKER
+export function isWorkerEnv() {
+  return mEnvType === ENV_WORKER
 }
 
 

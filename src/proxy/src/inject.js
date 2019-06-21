@@ -2,7 +2,7 @@ import * as path from './path.js'
 import * as util from "./util"
 // import * as jsfilter from './jsfilter.js'
 
-let conf
+let mConf
 
 
 const WORKER_INJECT = util.strToBytes(`\
@@ -18,8 +18,8 @@ export function getWorkerCode() {
 }
 
 
-export function setConf(v) {
-  conf = v
+export function setConf(conf) {
+  mConf = conf
 }
 
 
@@ -42,7 +42,7 @@ chrome-extension-resource: \
  */
 export function getHtmlCode(urlObj, pageId) {
   const icoUrl = path.PREFIX + urlObj.origin + '/favicon.ico'
-  const custom = conf.inject_html || ''
+  const custom = mConf.inject_html || ''
 
   return util.strToBytes(`\
 <!-- JS PROXY HELPER -->
