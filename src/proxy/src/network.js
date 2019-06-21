@@ -5,8 +5,6 @@ import * as util from './util'
 import * as tld from './tld.js'
 
 
-let conf
-
 const REFER_ORIGIN = location.origin + '/'
 const ENABLE_3RD_COOKIE = true
 
@@ -18,15 +16,16 @@ const REQ_HDR_ALLOW = new Set('accept,accept-charset,accept-encoding,accept-lang
 //
 // 如果返回所有字段名，长度会很大。
 // 因此请求头中设置 aceh__ 标记，告知服务器是否要返回所有字段名。
-let isAcehOld = true
+let mIsAcehOld = true
 
-let directHostSet
+let mDirectHostSet
+let mConf
 
 
-export function setConf(v) {
-  conf = v
+export function setConf(conf) {
+  mConf = conf
   // TODO:
-  directHostSet = new Set([])
+  mDirectHostSet = new Set([])
 }
 
 
@@ -156,7 +155,7 @@ function getResInfo(res) {
  */
 function initReqHdr(req, urlObj, cliUrlObj) {
   const sysHdr = new Headers({
-    '--ver': conf.ver,
+    '--ver': mConf.ver,
     '--url': urlx.delHash(urlObj.href),
     '--mode': req.mode,
     '--type': req.destination || '',
@@ -197,7 +196,7 @@ function initReqHdr(req, urlObj, cliUrlObj) {
   if (hasExtHdr) {
     sysHdr.set('--ext', JSON.stringify(extHdr))
   }
-  if (isAcehOld) {
+  if (mIsAcehOld) {
     sysHdr.set('--aceh', '1')
   }
   return sysHdr
@@ -298,7 +297,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     res = await fetch(req)
   }
   else if (method === 'GET') {
-    if (directHostSet.has(urlObj.host)) {
+    if (mDirectHostSet.has(urlObj.host)) {
       // 支持 cors 的资源
       // 有些服务器配置了 acao: *，直连可加速
       res = await proxyDirect(urlObj, req, reqOpt)
@@ -334,8 +333,8 @@ export async function launch(req, urlObj, cliUrlObj) {
   let resHdr = res.headers
 
   // 检测浏览器是否支持 aceh: *
-  if (isAcehOld && resHdr.has('--t')) {
-    isAcehOld = false
+  if (mIsAcehOld && resHdr.has('--t')) {
+    mIsAcehOld = false
     reqHdr.delete('--aceh')
   }
 

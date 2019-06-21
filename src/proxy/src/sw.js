@@ -9,8 +9,7 @@ import * as jsfilter from './jsfilter.js'
 import * as inject from './inject.js'
 
 
-let gConf
-
+let mConf
 const MAX_REDIR = 5
 
 /** @type {ServiceWorkerGlobalScope} */
@@ -288,15 +287,15 @@ async function proxy(e, urlObj) {
  * @param {FetchEvent} e 
  */
 async function onFetch(e) {
-  if (!gConf) {
-    gConf = await initConf()
+  if (!mConf) {
+    mConf = await initConf()
   }
   const req = e.request
   const urlStr = urlx.delHash(req.url)
 
   // 首页（例如 https://zjcqoo.github.io/）
   if (urlStr === path.ROOT || urlStr === path.HOME) {
-    const res = await fetch(gConf.assets_cdn + 'index_v3.html')
+    const res = await fetch(mConf.assets_cdn + 'index_v3.html')
     return makeHtmlRes(res.body)
   }
 
@@ -313,7 +312,7 @@ async function onFetch(e) {
   // 静态资源（例如 https://zjcqoo.github.io/__sys__/assets/ico/google.png）
   if (urlStr.startsWith(path.ASSETS)) {
     const filePath = urlStr.substr(path.ASSETS.length)
-    return fetch(gConf.assets_cdn + filePath)
+    return fetch(mConf.assets_cdn + filePath)
   }
 
   if (req.mode === 'navigate') {
@@ -362,7 +361,6 @@ function parseUrlHandler(handler) {
     // TODO: 支持通配符和正则
     map[match] = rule
   }
-console.log(map)
   return map
 }
 
@@ -376,6 +374,11 @@ function updateConf(conf) {
 }
 
 async function fetchConf() {
+  // TODO: 逻辑优化
+  const conf = self['__CONF__']
+  if (conf) {
+    return conf
+  }
   const res = await fetch('conf.js')
   const txt = await res.text()
   let ret
@@ -456,7 +459,7 @@ global.addEventListener('message', e => {
     // console.log('SW MSG.COOKIE_PULL:', src.id)
     sendMsg(src, MSG.SW_INFO_PUSH, {
       cookies: cookie.getNonHttpOnlyItems(),
-      conf: gConf,
+      conf: mConf,
     })
     break
 
@@ -471,21 +474,21 @@ global.addEventListener('message', e => {
     break
 
   case MSG.PAGE_CONF_GET:
-    if (gConf) {
-      sendMsg(src, MSG.SW_CONF_RETURN, gConf)
+    if (mConf) {
+      sendMsg(src, MSG.SW_CONF_RETURN, mConf)
     } else {
       initConf().then(conf => {
-        gConf = conf
-        sendMsg(src, MSG.SW_CONF_RETURN, gConf)
+        mConf = conf
+        sendMsg(src, MSG.SW_CONF_RETURN, mConf)
       })
     }
     break
 
   case MSG.PAGE_CONF_SET:
-    gConf = val
-    saveConf(gConf)
-    updateConf(gConf)
-    sendMsgToPages(MSG.SW_CONF_CHANGE, gConf)
+    mConf = val
+    saveConf(mConf)
+    updateConf(mConf)
+    sendMsgToPages(MSG.SW_CONF_CHANGE, mConf)
     break
 
   case MSG.PAGE_READY_CHECK:

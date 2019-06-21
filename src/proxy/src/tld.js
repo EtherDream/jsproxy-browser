@@ -4,8 +4,8 @@ import {isIPv4} from './util.js'
 
 
 /** @type {Map<string, string>} */
-const tldCache = new Map()
-const tldSet = new Set(tldData.split(','))
+const mTldCache = new Map()
+const mTldSet = new Set(tldData.split(','))
 
 /**
  * @param {string} domain 
@@ -32,7 +32,7 @@ function getDomainTld(domain) {
  * @param {string} domain 
  */
 export function getTld(domain) {
-  let ret = tldCache.get(domain)
+  let ret = mTldCache.get(domain)
   if (ret !== undefined) {
     return ret
   }
@@ -43,7 +43,7 @@ export function getTld(domain) {
     ret = getDomainTld(domain)
   }
 
-  tldCache.set(domain, ret)
+  mTldCache.set(domain, ret)
   return ret
 }
 
@@ -52,5 +52,5 @@ export function getTld(domain) {
  * @param {string} domain 
  */
 export function isTld(domain) {
-  return tldSet.has(domain)
+  return mTldSet.has(domain)
 }

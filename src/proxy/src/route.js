@@ -2,7 +2,7 @@ import * as urlx from './urlx.js'
 import * as util from './util'
 
 
-let conf
+let mConf
 
 /**
  * @param {number} urlHash 
@@ -10,7 +10,7 @@ let conf
  * @returns {string}
  */
 function getHostByNodeId(urlHash, id) {
-  const lines = conf.node_map[id].lines
+  const lines = mConf.node_map[id].lines
   return lines[urlHash % lines.length]
 }
 
@@ -28,11 +28,11 @@ function isLocalhost(host) {
  * @param {number} level 
  */
 export function genHttpUrl(urlHash, level) {
-  let node = conf.node_default
+  let node = mConf.node_default
 
   // 实验中...
   if (level === 2) {
-    node = conf.node_acc
+    node = mConf.node_acc
   }
 
   let host = getHostByNodeId(urlHash, node)
@@ -61,18 +61,18 @@ export function genWsUrl(urlObj, args) {
   const t = urlx.delScheme(urlx.delHash(urlObj.href))
 
   args['url__'] = scheme + '://' + t
-  args['ver__'] = conf.ver
+  args['ver__'] = mConf.ver
 
   const urlHash = util.strHash(urlObj.href)
-  const host = getHostByNodeId(urlHash, conf.node_default)
+  const host = getHostByNodeId(urlHash, mConf.node_default)
   const s = isLocalhost(host) ? '' : 's'
   return `ws${s}://${host}/ws?` + new URLSearchParams(args)
 }
 
 
 /**
- * @param {object} v 
+ * @param {object} conf 
  */
-export function setConf(v) {
-  conf = v
+export function setConf(conf) {
+  mConf = conf
 }
