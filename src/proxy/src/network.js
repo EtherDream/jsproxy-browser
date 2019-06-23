@@ -75,25 +75,19 @@ function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
  */
 function getResInfo(res) {
   const resHdrRaw = res.headers
+  let status = 200
 
   /** @type {string[]} */
   const cookieStrArr = []
-
   const headers = new Headers()
-
-  let status = res.status
-  if (status === 311 ||
-      status === 312 ||
-      status === 313 ||
-      status === 317 ||
-      status === 318
-  ) {
-    status -= 10
-  }
 
   resHdrRaw.forEach((val, key) => {
     if (key === 'access-control-allow-origin' ||
         key === 'access-control-expose-headers') {
+      return
+    }
+    if (key === '--s') {
+      status = +val
       return
     }
     if (key === '--t') {
