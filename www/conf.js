@@ -32,7 +32,7 @@ jsproxy_config({
       hidden: true,
       lines: [
         // 实验中...
-        'shrill-unit-8594.jsproxy.workers.dev'
+        'node-cfworker.etherdream.com:8443'
       ]
     }
   },
