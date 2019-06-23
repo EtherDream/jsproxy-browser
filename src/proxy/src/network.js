@@ -80,16 +80,7 @@ function getResInfo(res) {
   const cookieStrArr = []
 
   const headers = new Headers()
-
-  let status = res.status
-  if (status === 311 ||
-      status === 312 ||
-      status === 313 ||
-      status === 317 ||
-      status === 318
-  ) {
-    status -= 10
-  }
+  const status = +headers.get('--s')
 
   resHdrRaw.forEach((val, key) => {
     if (key === 'access-control-allow-origin' ||
