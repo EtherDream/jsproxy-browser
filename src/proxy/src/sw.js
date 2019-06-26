@@ -430,8 +430,6 @@ async function initConf() {
   }
   updateConf(conf)
 
-  network.loadManifest()
-
   initing = false
   initingQueue.forEach(f => f(conf))
   return conf

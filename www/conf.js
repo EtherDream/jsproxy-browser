@@ -1,6 +1,11 @@
 jsproxy_config({
   // 当前配置的版本（服务端记录在日志中，方便排查问题）
-  ver: '55',
+  ver: '56',
+  
+  static_boost: {
+    enable: true,
+    ver: 1
+  },
 
   // 节点配置
   node_map: {

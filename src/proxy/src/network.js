@@ -3,6 +3,7 @@ import * as cookie from './cookie.js'
 import * as urlx from './urlx.js'
 import * as util from './util'
 import * as tld from './tld.js'
+import * as cdn from './cdn.js'
 
 
 const REFER_ORIGIN = location.origin + '/'
@@ -24,6 +25,7 @@ let mConf
 
 export function setConf(conf) {
   mConf = conf
+  cdn.setConf(conf)
   // TODO:
   mDirectHostSet = new Set([])
 }
@@ -299,10 +301,14 @@ export async function launch(req, urlObj, cliUrlObj) {
     else {
       // 本地 CDN 加速
       // 一些大网站常用的静态资源存储在 jsdelivr 上
-      const fileID = getCdnFileId(urlHash)
-      if (fileID !== -1) {
-        res = await proxyFromCdn(fileID)
+      const ver = cdn.getFileVer(urlHash)
+      if (ver >= 0) {
         console.log('cdn hit:', urlObj.href)
+        try {
+          res = await cdn.proxy(urlHash, ver)
+        } catch (err) {
+          console.warn('[jsproxy] proxy from cdn fail:', err)
+        }
       }
     }
   }
@@ -380,63 +386,4 @@ export async function launch(req, urlObj, cliUrlObj) {
   }
 
   return {res, status, headers, cookies}
-}
-
-
-const CDN = 'https://cdn.jsdelivr.net/gh/zjcqoo/cache@'
-
-/** @type {Uint32Array} */
-let gCdnUrlHashList
-
-
-
-export async function loadManifest() {
-  // TODO: 记录每个资源的版本号
-  const res = await fetch(CDN + '5/list.txt')
-  const buf = await res.arrayBuffer()
-  gCdnUrlHashList = new Uint32Array(buf)
-}
-
-
-/**
- * @param {number} urlHash 
- */
-export function getCdnFileId(urlHash) {
-  if (!gCdnUrlHashList) {
-    return -1
-  }
-  const fileId = util.binarySearch(gCdnUrlHashList, urlHash)
-  return fileId
-}
-
-
-/**
- * @param {number} id 
- */
-export async function proxyFromCdn(id) {
-  const urlHash = gCdnUrlHashList[id]
-  const hashHex = util.numToHex(urlHash, 8)
-
-  try {
-    const res = await fetch(CDN + '5/' + hashHex + '.txt')
-    var buf = await res.arrayBuffer()
-  } catch (err) {
-    console.warn('[jsproxy] proxyFromCdn fail')
-    return
-  }
-
-  const b = new Uint8Array(buf)
-  
-  const hdrLen = b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]
-  const hdrBuf = b.subarray(4, 4 + hdrLen)
-  const hdrStr = util.bytesToStr(hdrBuf)
-  const hdrObj = JSON.parse(hdrStr)
-
-  const body = b.subarray(4 + hdrLen)
-  hdrObj['date'] = new Date().toUTCString()
-
-  return new Response(body, {
-    status: 200,
-    headers: hdrObj
-  })
 }
