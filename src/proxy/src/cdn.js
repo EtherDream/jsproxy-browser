@@ -14,15 +14,16 @@ export async function setConf(conf) {
   }
   const latest = info.ver
 
-  // TODO: 合并 diff 文件
-  for (let ver = 0; ver <= latest; ver++) {
-    const res = await fetch(CDN + ver + '/diff')
-    const buf = await res.arrayBuffer()
-    const u32 = new Uint32Array(buf)
-    const num = u32[0]
+  const res = await fetch(CDN + latest + '/full')
+  const buf = await res.arrayBuffer()
+  const u32 = new Uint32Array(buf)
 
-    for (let i = 1; i < num; i++) {
-      const urlHash = u32[i]
+  let p = 0
+  for (let ver = 0; ver <= latest; ver++) {
+    const num = u32[p++]
+
+    for (let i = 0; i < num; i++) {
+      const urlHash = u32[p++]
       mUrlHashVerMap.set(urlHash, ver)
     }
   }
