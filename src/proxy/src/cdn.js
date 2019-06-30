@@ -3,6 +3,8 @@ import * as util from './util'
 
 const CDN = 'https://cdn.jsdelivr.net/npm/jsproxy-cache-01@0.0.'
 
+let mCurVer = -1
+
 /** @type {Map<number, number>} */
 let mUrlHashVerMap = new Map()
 
@@ -13,6 +15,11 @@ export async function setConf(conf) {
     return
   }
   const latest = info.ver
+  if (mCurVer >= latest) {
+    return
+  }
+  mCurVer = latest
+  console.log('[jsproxy] cdn cache ver:', latest)
 
   const res = await fetch(CDN + latest + '/full')
   const buf = await res.arrayBuffer()

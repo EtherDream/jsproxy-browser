@@ -9,6 +9,8 @@ import * as jsfilter from './jsfilter.js'
 import * as inject from './inject.js'
 
 
+const CONF_UPDATE_TIMER = 1000 * 60 * 5
+
 let mConf
 const MAX_REDIR = 5
 
@@ -17,7 +19,7 @@ const MAX_REDIR = 5
 const global = self
 const clients = global.clients
 
-let gUrlHandler
+let mUrlHandler
 
 
 /**
@@ -288,7 +290,7 @@ async function proxy(e, urlObj) {
  */
 async function onFetch(e) {
   if (!mConf) {
-    mConf = await initConf()
+    await initConf()
   }
   const req = e.request
   const urlStr = urlx.delHash(req.url)
@@ -324,7 +326,7 @@ async function onFetch(e) {
 
   let targetUrlStr = urlx.decUrlStrAbs(urlStr)
   
-  const handler = gUrlHandler[targetUrlStr]
+  const handler = mUrlHandler[targetUrlStr]
   if (handler) {
     const {
       redir,
@@ -364,32 +366,31 @@ function parseUrlHandler(handler) {
   return map
 }
 
-
-function updateConf(conf) {
+// TODO: 逻辑优化
+function updateConf(conf, force) {
+  if (force) {
+    mConf = conf
+  } else {
+    if (mConf) {
+      if (conf.ver <= mConf.ver) {
+        return
+      }
+      conf.node_default = mConf.node_default
+      sendMsgToPages(MSG.SW_CONF_CHANGE, mConf)
+    }
+  }
   inject.setConf(conf)
   route.setConf(conf)
   network.setConf(conf)
 
-  gUrlHandler = parseUrlHandler(conf.url_handler)
+  mUrlHandler = parseUrlHandler(conf.url_handler)
+  /*await*/ saveConf(conf)
+
+  mConf = conf
 }
 
-async function fetchConf() {
-  // TODO: 逻辑优化
-  const conf = self['__CONF__']
-  if (conf) {
-    return conf
-  }
-  const res = await fetch('conf.js')
-  const txt = await res.text()
-  let ret
-  self['jsproxy_config'] = function(v) {
-    ret = v
-  }
-  Function(txt)()
-  return ret
-}
 
-async function loadConf() {
+async function readConf() {
   const cache = await caches.open("sys")
   const req = new Request("/conf.json")
   const res = await cache.match(req)
@@ -406,33 +407,45 @@ async function saveConf(conf) {
   return cache.put(req, res)
 }
 
-let initing = false
-let initingQueue = []
+async function loadConf() {
+  const res = await fetch('conf.js')
+  const txt = await res.text()
+  self['jsproxy_config'] = updateConf
+  Function(txt)()
+}
+
+
+/** @type {Function[]} */
+let mConfInitQueue
 
 async function initConf() {
-  if (initing) {
+  if (mConfInitQueue) {
     return new Promise(f => {
-      initingQueue.push(f)
+      mConfInitQueue.push(f)
     })
   }
-  initing = true
+  mConfInitQueue = []
 
   let conf
   try {
-    conf = await loadConf()
+    conf = await readConf()
   } catch (err) {
-    console.warn('loadConf fail:', err)
+    console.warn('load conf fail:', err)
   }
   if (!conf) {
-    conf = await fetchConf()
-    console.log('fetchConf:', conf)
-    await saveConf()
+    conf = self['__CONF__']
   }
-  updateConf(conf)
+  if (conf) {
+    updateConf(conf)
+  } else {
+    conf = await loadConf()
+  }
 
-  initing = false
-  initingQueue.forEach(f => f(conf))
-  return conf
+  // 定期更新配置
+  setInterval(loadConf, CONF_UPDATE_TIMER)
+
+  mConfInitQueue.forEach(f => f())
+  mConfInitQueue = null
 }
 
 
@@ -475,18 +488,19 @@ global.addEventListener('message', e => {
     if (mConf) {
       sendMsg(src, MSG.SW_CONF_RETURN, mConf)
     } else {
-      initConf().then(conf => {
-        mConf = conf
+      initConf().then(_ => {
         sendMsg(src, MSG.SW_CONF_RETURN, mConf)
       })
     }
     break
 
   case MSG.PAGE_CONF_SET:
-    mConf = val
-    saveConf(mConf)
-    updateConf(mConf)
+    updateConf(val, true)
     sendMsgToPages(MSG.SW_CONF_CHANGE, mConf)
+    break
+
+  case MSG.PAGE_RELOAD_CONF:
+    /*await*/ loadConf()
     break
 
   case MSG.PAGE_READY_CHECK:

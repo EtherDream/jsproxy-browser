@@ -1,33 +1,35 @@
 jsproxy_config({
   // 当前配置的版本（记录在日志中，用于排查问题）
-  ver: '58',
+  ver: '60',
 
   static_boost: {
     enable: true,
-    ver: 5
+    ver: 11
   },
 
   // 节点配置
   node_map: {
     'aliyun-hk': {
-      label: '轻量云-香港',
+      label: '演示服务-香港节点',
       lines: [
-        // 多条线路，负载均衡会从其中选一条
+        // 多条线路，负载均衡系统会从其中选一条
         'node-aliyun-hk-0.etherdream.com:8443',
         'node-aliyun-hk-1.etherdream.com:8443',
         'node-aliyun-hk-2.etherdream.com:8443',
       ]
     },
     'aliyun-sg': {
-      label: '轻量云-新加坡',
+      label: '演示服务-新加坡节点',
       lines: [
         'node-aliyun-sg.etherdream.com:8443'
       ]
     },
-    'bwh-la': {
-      label: '搬瓦工-洛杉矶',
+    'mysite': {
+      label: '当前站点',
       lines: [
-        'node-bwh-la.etherdream.com:8443'
+        // 静态资源和代理接口位于同个服务器的场合
+        // 例如默认的 ip.xip.io 以及 cloudflare worker
+        location.host
       ]
     },
     'cfworker': {
@@ -35,7 +37,6 @@ jsproxy_config({
       hidden: true,
       lines: [
         // 实验中...
-        // 参考 https://github.com/EtherDream/jsproxy/tree/master/cf-worker
         'node-cfworker.etherdream.com:8443'
       ]
     }

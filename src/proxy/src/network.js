@@ -19,15 +19,14 @@ const REQ_HDR_ALLOW = new Set('accept,accept-charset,accept-encoding,accept-lang
 // 因此请求头中设置 aceh__ 标记，告知服务器是否要返回所有字段名。
 let mIsAcehOld = true
 
-let mDirectHostSet
+// TODO:
+let mDirectHostSet = new Set([])
 let mConf
 
 
 export function setConf(conf) {
   mConf = conf
   cdn.setConf(conf)
-  // TODO:
-  mDirectHostSet = new Set([])
 }
 
 
@@ -303,7 +302,7 @@ export async function launch(req, urlObj, cliUrlObj) {
       // 一些大网站常用的静态资源存储在 jsdelivr 上
       const ver = cdn.getFileVer(urlHash)
       if (ver >= 0) {
-        console.log('cdn hit:', urlObj.href)
+        console.log('[jsproxy] cdn hit:', urlObj.href)
         try {
           res = await cdn.proxy(urlHash, ver)
         } catch (err) {

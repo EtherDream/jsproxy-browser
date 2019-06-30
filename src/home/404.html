@@ -50,7 +50,7 @@
       return
     }
     var sw = navigator.serviceWorker
-    if (!sw || !self.ReadableStream) {
+    if (!sw || !self.AbortController) {
       showErr('请使用最新版 Chrome 浏览器访问')
       return
     }

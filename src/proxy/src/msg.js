@@ -9,6 +9,7 @@ export const PAGE_INIT_END = 6
 
 export const PAGE_CONF_SET = 110
 export const PAGE_CONF_GET = 111
+export const PAGE_RELOAD_CONF = 112
 
 export const SW_CONF_RETURN = 112
 export const SW_CONF_CHANGE = 113

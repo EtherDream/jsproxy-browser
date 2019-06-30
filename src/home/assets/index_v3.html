@@ -155,21 +155,7 @@
       }
     }
 
-    function parseTestNode() {
-      if (location.port === '8443' || location.port === '8080') {
-        const host = location.host
-        conf.node_map[host] = {
-          label: host,
-          lines: [host]
-        }
-        conf.node_default = host
-        sendMsgToSw(PAGE_CONF_SET, conf)
-      }
-    }
-
     function showConf() {
-      parseTestNode()
-
       const nodeMap = conf.node_map
       Object.keys(nodeMap).forEach(id => {
         const info = nodeMap[id]
