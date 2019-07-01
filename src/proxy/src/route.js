@@ -3,6 +3,7 @@ import * as util from './util'
 
 
 let mConf
+let mNodeLinesMap
 
 /**
  * @param {number} urlHash 
@@ -10,8 +11,16 @@ let mConf
  * @returns {string}
  */
 function getHostByNodeId(urlHash, id) {
-  const lines = mConf.node_map[id].lines
-  return lines[urlHash % lines.length]
+  const lines = mNodeLinesMap[id]
+  let sum = 0
+
+  for (let i = 0; i < lines.length; i++) {
+    const {host, weight} = lines[i]
+    sum += weight
+    if (sum > urlHash) {
+      return host
+    }
+  }
 }
 
 
@@ -75,4 +84,23 @@ export function genWsUrl(urlObj, args) {
  */
 export function setConf(conf) {
   mConf = conf
+  mNodeLinesMap = {}
+
+  for (const [id, info] of Object.entries(conf.node_map)) {
+    const lines = []
+    let weightSum = 0
+
+    for (const [host, weight] of Object.entries(info.lines)) { 
+      weightSum += weight
+      lines.push({host, weight})
+    }
+
+    // 权重值按比例转换成 0 ~ 2^32 之间的整数，方便后续计算
+    lines.forEach(v => {
+      v.weight = (v.weight / weightSum * 0xFFFFFFFF) >>> 0
+    })
+    lines.sort((a, b) => b.weight - a.weight)
+
+    mNodeLinesMap[id] = lines
+  }
 }
