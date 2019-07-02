@@ -368,16 +368,17 @@ function parseUrlHandler(handler) {
 
 // TODO: 逻辑优化
 function updateConf(conf, force) {
-  if (force) {
-    mConf = conf
-  } else {
-    if (mConf) {
-      if (conf.ver <= mConf.ver) {
-        return
-      }
-      conf.node_default = mConf.node_default
-      sendMsgToPages(MSG.SW_CONF_CHANGE, mConf)
+  if (!force && mConf) {
+    if (conf.ver <= mConf.ver) {
+      return
     }
+    if (conf.node_map[mConf.node_default]) {
+      conf.node_default = mConf.node_default
+    } else {
+      console.warn('default node %s -> %s',
+        mConf.node_default, conf.node_default)
+    }
+    sendMsgToPages(MSG.SW_CONF_CHANGE, mConf)
   }
   inject.setConf(conf)
   route.setConf(conf)
@@ -505,6 +506,7 @@ global.addEventListener('message', e => {
 
   case MSG.PAGE_READY_CHECK:
     sendMsg(src, MSG.SW_READY)
+    /*await*/ loadConf()
     break
   }
 })
