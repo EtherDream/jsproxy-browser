@@ -424,6 +424,9 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
     domHook.attr(tag, proto, {
       name,
       onget(val) {
+        if (val === null) {
+          return ''
+        }
         return urlx.decUrlStrRel(val, this)
       },
       onset(val) {
@@ -434,7 +437,7 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
       }
     })
   }
-  
+
   const anchorProto = win.HTMLAnchorElement.prototype
   hookAttr('A', anchorProto, 'href')
 
