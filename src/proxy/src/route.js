@@ -11,13 +11,9 @@ let mNodeLinesMap
  * @returns {string}
  */
 function getHostByNodeId(urlHash, id) {
-  const lines = mNodeLinesMap[id]
-  let sum = 0
-
-  for (let i = 0; i < lines.length; i++) {
-    const {host, weight} = lines[i]
-    sum += weight
-    if (sum > urlHash) {
+  let a = 0
+  for (const {weight, host} of mNodeLinesMap[id]) {
+    if ((a += weight) > urlHash) {
       return host
     }
   }
@@ -96,9 +92,9 @@ export function setConf(conf) {
     }
 
     // 权重值按比例转换成 0 ~ 2^32 之间的整数，方便后续计算
-    lines.forEach(v => {
+    for (const v of lines) {
       v.weight = (v.weight / weightSum * 0xFFFFFFFF) >>> 0
-    })
+    }
     lines.sort((a, b) => b.weight - a.weight)
 
     mNodeLinesMap[id] = lines

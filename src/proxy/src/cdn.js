@@ -52,6 +52,9 @@ export function getFileVer(urlHash) {
 export async function proxy(urlHash, urlVer) {
   const hashHex = util.numToHex(urlHash, 8)
   const res = await fetch(CDN + urlVer + '/' + hashHex + '.txt')
+  if (res.status !== 200) {
+    throw 'bad status: ' + res.status
+  }
   const buf = await res.arrayBuffer()
   const b = new Uint8Array(buf)
 
