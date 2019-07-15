@@ -49,9 +49,19 @@
       showErr('本程序需要 HTTPS 站点')
       return
     }
+    if (!self.ReadableStream) {
+      showErr('请使用最新的 HTML5 浏览器')
+      return
+    }
     var sw = navigator.serviceWorker
-    if (!sw || !self.AbortController) {
-      showErr('请使用最新版 Chrome 浏览器访问')
+    if (!sw) {
+      var ua = navigator.userAgent
+      if (/Firefox/.test(ua)) {
+        showErr('本网站不支持 FireFox 隐身模式')
+      }
+      else if (/iPhone|iPad/.test(ua)) {
+        showErr('iOS 上请使用 Safari 浏览器')
+      }
       return
     }
     sw

@@ -4,12 +4,18 @@ import * as urlx from './urlx.js'
 import * as util from './util'
 import * as tld from './tld.js'
 import * as cdn from './cdn.js'
+import {Database} from './database.js'
 
+
+const CACHE_TIME = 3600 * 24 * 7
 
 const REFER_ORIGIN = location.origin + '/'
 const ENABLE_3RD_COOKIE = true
 
 const REQ_HDR_ALLOW = new Set('accept,accept-charset,accept-encoding,accept-language,accept-datetime,authorization,cache-control,content-length,content-type,date,if-match,if-modified-since,if-none-match,if-range,if-unmodified-since,max-forwards,pragma,range,te,upgrade,upgrade-insecure-requests,origin,user-agent,x-requested-with,chrome-proxy'.split(','))
+
+/** @type {Database} */
+let mDB
 
 
 // 部分浏览器不支持 access-control-expose-headers: *
@@ -27,6 +33,43 @@ let mConf
 export function setConf(conf) {
   mConf = conf
   cdn.setConf(conf)
+}
+
+
+async function initDB() {
+  mDB = new Database('sys', 'url-cache')
+  await mDB.open({
+    keyPath: 'url'
+  })
+}
+
+
+/**
+ * @param {string} url 
+ */
+async function getUrlCache(url) {
+  mDB || await initDB()
+  return await mDB.query(url)
+}
+
+
+/**
+ * @param {string} url 
+ * @param {string} host 
+ * @param {number} expires 
+ */
+async function setUrlCache(url, host, expires) {
+  mDB || await initDB()
+  await mDB.put({url, host, expires})
+}
+
+
+/**
+ * @param {string} url 
+ */
+async function delUrlCache(url) {
+  mDB || await initDB()
+  await mDB.delete(url)
 }
 
 
@@ -75,14 +118,14 @@ function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
  * @param {Response} res 
  */
 function getResInfo(res) {
-  const resHdrRaw = res.headers
-  let status = 200
+  const rawHeaders = res.headers
+  let status = res.status
 
   /** @type {string[]} */
   const cookieStrArr = []
   const headers = new Headers()
 
-  resHdrRaw.forEach((val, key) => {
+  rawHeaders.forEach((val, key) => {
     if (key === 'access-control-allow-origin' ||
         key === 'access-control-expose-headers') {
       return
@@ -201,57 +244,26 @@ function initReqHdr(req, urlObj, cliUrlObj) {
 /**
  * 直连的资源
  * 
- * @param {URL} urlObj 
+ * @param {string} url 
  * @param {Request} req 
- * @param {RequestInit} reqOpt 
  */
-async function proxyDirect(urlObj, req, reqOpt) {
-  let hdr = req.headers
-
-  // 从地址栏访问资源，请求头会出现该字段，导致出现 preflight
-  if (hdr.has('upgrade-insecure-requests')) {
-    hdr = new Headers(hdr)
-    hdr.delete('upgrade-insecure-requests')
-  }
-  reqOpt.headers = hdr
-
+async function proxyDirect(url, req) {
   try {
-    const res = await fetch(urlObj.href, reqOpt)
-    if (res.status === 200 || res.status === 206) {
+    const res = await fetch(url, {
+      referrerPolicy: 'no-referrer',
+    })
+    const {status} = res
+    if (status === 200 || status === 206) {
       return res
     }
-    console.warn('[jsproxy] proxyDirect invalid status:', res.status, urlObj.href)
+    console.warn('direct status:', status, url)
   } catch (err) {
-    console.warn('[jsproxy] proxyDirect fail:', urlObj.href)
+    console.warn('direct fail:', url)
   }
 }
 
 
-/**
- * @param {string} url
- * @param {*} reqOpt 
- */
-async function proxyNode2(url, reqOpt) {
-  try {
-    var res = await fetch(url, reqOpt)
-  } catch (err) {
-    return null
-  }
-
-  if (res.status === 400) {
-    const err = await res.text()
-    console.warn('[jsproxy] proxy fail:', err)
-    return null
-  }
-
-  if (res.status !== 200 && res.status !== 206) {
-    console.warn('[jsproxy] proxy invalid status:', res.status)
-    return null
-  }
-
-  return res
-}
-
+const MAX_RETRY = 5
 
 /**
  * @param {Request} req 
@@ -259,9 +271,7 @@ async function proxyNode2(url, reqOpt) {
  * @param {URL} cliUrlObj 
  */
 export async function launch(req, urlObj, cliUrlObj) {
-  const {
-    method
-  } = req
+  const {method} = req
 
   /** @type {RequestInit} */
   const reqOpt = {
@@ -271,9 +281,13 @@ export async function launch(req, urlObj, cliUrlObj) {
   }
 
   if (method === 'POST' && !req.bodyUsed) {
-    const buf = await req.arrayBuffer()
-    if (buf.byteLength > 0) {
-      reqOpt.body = buf
+    if (req.body) {
+      reqOpt.body = req.body
+    } else {
+      const buf = await req.arrayBuffer()
+      if (buf.byteLength > 0) {
+        reqOpt.body = buf
+      }
     }
   }
 
@@ -281,87 +295,128 @@ export async function launch(req, urlObj, cliUrlObj) {
     reqOpt.signal = req.signal
   }
 
-  const urlHash = util.strHash(urlObj.href)
+  if (!urlx.isHttpProto(urlObj.protocol)) {
+    // 非 HTTP 协议的资源，直接访问
+    // 例如 youtube 引用了 chrome-extension: 协议的脚本
+    const res = await fetch(req)
+    return {res}
+  }
+
+  const url = urlObj.href
+  const urlHash = util.strHash(url)
+  let host = ''
+  let rawInfo = ''
+
+  const reqHdr = initReqHdr(req, urlObj, cliUrlObj)
+  reqOpt.headers = reqHdr
+
+  while (method === 'GET') {
+    // 该资源是否加载过？
+    const r = await getUrlCache(url)
+    if (r && r.host) {
+      const now = util.getTimeStamp()
+      if (now < r.expires) {
+        // 使用之前的节点，提高缓存命中率
+        host = r.host
+        rawInfo = r.info
+        break
+      } else {
+        /*await*/ delUrlCache(url)
+      }
+    }
+
+    // 支持 CORS 的站点，可直连
+    if (mDirectHostSet.has(urlObj.host)) {
+      console.log('direct hit:', url)
+      const res = await proxyDirect(url, req)
+      if (res) {
+        setUrlCache(url, '', 0)
+        return {res}
+      }
+    }
+
+    // 常用静态资源 CDN 加速
+    const ver = cdn.getFileVer(urlHash)
+    if (ver >= 0) {
+      console.log('cdn hit:', url)
+      const res = await cdn.proxy(urlHash, ver)
+      if (res) {
+        setUrlCache(url, '', 0)
+        return {res}
+      }
+    }
+
+    break
+  }
+
+  let level = 1
+
+  // 之前已加载过，服务器
+  if (host) {
+    level = 0
+  }
 
   /** @type {Response} */
   let res
 
-  if (!urlx.isHttpProto(urlObj.protocol)) {
-    // 非 HTTP 协议的资源，直接访问
-    // 例如 youtube 引用了 chrome-extension: 协议的脚本
-    res = await fetch(req)
-  }
-  else if (method === 'GET') {
-    if (mDirectHostSet.has(urlObj.host)) {
-      // 支持 cors 的资源
-      // 有些服务器配置了 acao: *，直连可加速
-      res = await proxyDirect(urlObj, req, reqOpt)
+  /** @type {Headers} */
+  let resHdr
+
+
+  for (let i = 0; i < MAX_RETRY; i++) {
+    if (!host) {
+      host = route.getHost(urlHash, level)
     }
-    else {
-      // 本地 CDN 加速
-      // 一些大网站常用的静态资源存储在 jsdelivr 上
-      const ver = cdn.getFileVer(urlHash)
-      if (ver >= 0) {
-        console.log('[jsproxy] cdn hit:', urlObj.href)
-        try {
-          res = await cdn.proxy(urlHash, ver)
-        } catch (err) {
-          console.warn('[jsproxy] proxy from cdn fail:', err)
-        }
-      }
+    const proxyUrl = route.genUrl(host, 'http')
+
+    // 即使未命中缓存，在请求“加速节点”时也能带上文件信息
+    if (rawInfo) {
+      reqHdr.set('--raw-info', rawInfo)
+    } else {
+      reqHdr.delete('--raw-info')
     }
-  }
 
-  if (res) {
-    return {
-      res,
-      status: res.status || 200,
-      headers: new Headers(res.headers),
+    res = null
+    try {
+      res = await fetch(proxyUrl, reqOpt)
+    } catch (err) {
+      console.warn('fetch fail:', proxyUrl)
+      break
+      // TODO: 重试其他线路
+      // route.setFailHost(host)
     }
-  }
+    resHdr = res.headers
 
-  // 以上都不可用，走自己的代理服务器
-  // 请求参数打包在头部字段
-  const reqHdr = initReqHdr(req, urlObj, cliUrlObj)
-  reqOpt.headers = reqHdr
+    // 目前只有加速节点会返回该信息
+    const resErr = resHdr.get('--error')
+    if (resErr) {
+      console.warn('[jsproxy] proxy fail:', resErr)
+      rawInfo = ''
+      level = 0
+      continue
+    }
 
-  let level = 1
-  let proxyUrl = route.genHttpUrl(urlHash, level)
-  res = await fetch(proxyUrl, reqOpt)
+    // 检测浏览器是否支持 aceh: *
+    if (mIsAcehOld && resHdr.has('--t')) {
+      mIsAcehOld = false
+      reqHdr.delete('--aceh')
+    }
 
-  let resHdr = res.headers
-
-  // 检测浏览器是否支持 aceh: *
-  if (mIsAcehOld && resHdr.has('--t')) {
-    mIsAcehOld = false
-    reqHdr.delete('--aceh')
-  }
-
-  do {
     // 是否切换节点
-    if (!resHdr.has('--switched')) {
-      break
+    if (resHdr.has('--switched')) {
+      rawInfo = resHdr.get('--raw-info')
+      reqHdr.set('--level', ++level + '')
+      continue
     }
 
-    const rawInfo = resHdr.get('--raw-info')
-    reqHdr.set('--raw-info', rawInfo)
+    break
+  }
 
-    // TODO: 逻辑优化
-    level++
-    reqHdr.set('--level', level + '')
-    proxyUrl = route.genHttpUrl(urlHash, level)
+  if (!res) {
+    return
+  }
 
-    res = await proxyNode2(proxyUrl, reqOpt)
-    if (res) {
-      break
-    }
-
-    // 切换失败，使用原节点
-    // TODO: 尝试更多廉价节点，最坏情况才使用原节点
-    reqHdr.set('--level', '0')
-    proxyUrl = route.genHttpUrl(urlHash, 0)
-    res = await fetch(proxyUrl, reqOpt)
-  } while (0)
+  setUrlCache(url, host, util.getTimeStamp() + CACHE_TIME)
 
   const {
     status, headers, cookieStrArr
@@ -372,7 +427,7 @@ export async function launch(req, urlObj, cliUrlObj) {
   // http://www.otsukare.info/2015/03/26/refresh-http-header
   const refresh = headers.get('refresh')
   if (refresh) {
-    const newVal = urlx.replaceHttpRefresh(refresh, urlObj.href)
+    const newVal = urlx.replaceHttpRefresh(refresh, url)
     if (newVal !== refresh) {
       console.log('[jsproxy] http refresh:', refresh)
       headers.set('refresh', newVal)
@@ -381,7 +436,10 @@ export async function launch(req, urlObj, cliUrlObj) {
 
   let cookies
   if (cookieStrArr.length) {
-    cookies = procResCookie(cookieStrArr, urlObj, cliUrlObj)
+    const items = procResCookie(cookieStrArr, urlObj, cliUrlObj)
+    if (items.length) {
+      cookies = items
+    }
   }
 
   return {res, status, headers, cookies}

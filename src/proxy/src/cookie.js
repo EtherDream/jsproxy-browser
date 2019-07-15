@@ -1,7 +1,4 @@
-const assign = Object.assign
-const now = Date.now
-const parseDate = Date.parse
-const _isNaN = isNaN
+import Database from './database.js'
 
 
 function Cookie() {
@@ -15,6 +12,23 @@ function Cookie() {
   this.secure = false
   this.httpOnly = false
   this.sameSite = ''
+}
+
+/**
+ * @param {Cookie} src 
+ * @param {Cookie} dst 
+ */
+function copy(dst, src) {
+  dst.name = src.name
+  dst.value = src.value
+  dst.domain = src.domain
+  dst.hostOnly = src.hostOnly
+  dst.path = src.path
+  dst.expires = src.expires
+  dst.isExpired = src.isExpired
+  dst.secure = src.secure
+  dst.httpOnly = src.httpOnly
+  dst.sameSite = src.sameSite
 }
 
 
@@ -45,11 +59,11 @@ function isSubDomain(cookieDomain, urlDomain) {
 
 /**
  * @param {Cookie} item 
- * @param {number} tick
+ * @param {number} now
  */
-function isExpired(item, tick) {
+function isExpire(item, now) {
   const v = item.expires
-  return !_isNaN(v) && v < tick
+  return !isNaN(v) && v < now
 }
 
 
@@ -91,20 +105,19 @@ class CookieDomainNode {
 }
 
 /** @type {Map<string, Cookie>} */
-const idCookieMap = new Map()
+const mIdCookieMap = new Map()
 
-const cookieNodeRoot = new CookieDomainNode()
+const mCookieNodeRoot = new CookieDomainNode()
 
 
 
 export function getNonHttpOnlyItems() {
-  /** @type {Cookie[]} */
   const ret = []
-  idCookieMap.forEach(item => {
+  for (const item of mIdCookieMap.values()) {
     if (!item.httpOnly) {
       ret.push(item)
     }
-  })
+  }
   return ret
 }
 
@@ -116,6 +129,7 @@ export function getNonHttpOnlyItems() {
 export function parse(str, urlObj) {
   const item = new Cookie()
   const arr = str.split(';')
+  const now = Date.now()
 
   for (let i = 0; i < arr.length; i++) {
     let key, val
@@ -144,8 +158,8 @@ export function parse(str, urlObj) {
 
     switch (key.toLocaleLowerCase()) {
     case 'expires':
-      if (_isNaN(item.expires)) {
-        item.expires = parseDate(val)
+      if (isNaN(item.expires)) {
+        item.expires = Date.parse(val)
       }
       break
     case 'domain':
@@ -164,7 +178,7 @@ export function parse(str, urlObj) {
       item.secure = true
       break
     case 'max-age':
-      item.expires = now() + (+val) * 1000
+      item.expires = now + (+val) * 1000
       break
     case 'samesite':
       item.sameSite = val
@@ -172,8 +186,7 @@ export function parse(str, urlObj) {
     }
   }
 
-  const tick = now()
-  if (isExpired(item, tick)) {
+  if (isExpire(item, now)) {
     item.isExpired = true
   }
 
@@ -251,27 +264,27 @@ function getCookieId(item) {
 export function set(item) {
   // console.log('set:', item)
   const id = getCookieId(item)
-  const matched = idCookieMap.get(id)
+  const matched = mIdCookieMap.get(id)
 
   if (matched) {
     if (item.isExpired) {
       // delete
-      idCookieMap.delete(id)
+      mIdCookieMap.delete(id)
       matched.isExpired = true
     } else {
-      assign(matched, item)
+      copy(matched, item)
     }
   } else {
     // create
     const labels = item.domain.split('.')
     let labelPos = labels.length
-    let node = cookieNodeRoot
+    let node = mCookieNodeRoot
     do {
       node = node.nextChild(labels[--labelPos])
     } while (labelPos !== 0)
   
     node.addCookie(item)
-    idCookieMap.set(id, item)
+    mIdCookieMap.set(id, item)
   }
 }
 
@@ -281,7 +294,7 @@ export function set(item) {
  */
 export function concat(urlObj) {
   const ret = []
-  const tick = now()
+  const now = Date.now()
   const domain = urlObj.hostname
   const path = urlObj.pathname
   const isHttps = (urlObj.protocol === 'https:')
@@ -289,32 +302,36 @@ export function concat(urlObj) {
 
   const labels = domain.split('.')
   let labelPos = labels.length
-  let node = cookieNodeRoot
+  let node = mCookieNodeRoot
   do {
     node = node.getChild(labels[--labelPos])
     if (!node) {
       break
     }
     const items = node.items
-    items && items.forEach(item => {
+    if (!items) {
+      continue
+    }
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
       // https url | secure flag | carry
       //   ✔       |   ✔         |   ✔
       //   ✔       |   ✘         |   ✔
       //   ✘       |   ✘         |   ✔
       //   ✘       |   ✔         |   ✘
       if (!isHttps && item.secure) {
-        return
+        break
       }
       // HostOnly Cookie 需匹配完整域名
       if (item.hostOnly && labelPos !== 0) {
-        return
+        break
       }
       if (!isSubPath(item.path, path)) {
-        return
+        break
       }
-      if (isExpired(item, tick)) {
+      if (isExpire(item, now)) {
         item.isExpired = true
-        return
+        break
       }
       // TODO: same site
 
@@ -323,7 +340,7 @@ export function concat(urlObj) {
         str = item.name + '=' + str
       }
       ret.push(str)
-    })
+    }
   } while (labelPos !== 0)
 
   return ret.join('; ')

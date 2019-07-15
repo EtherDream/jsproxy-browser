@@ -1,6 +1,6 @@
 import * as util from './util'
 
-
+// 暂时先用 jsdelivr 试验。之后换成速度很快、容量更大的免费图床
 const CDN = 'https://cdn.jsdelivr.net/npm/jsproxy-cache-01@0.0.'
 
 let mCurVer = -1
@@ -49,7 +49,7 @@ export function getFileVer(urlHash) {
  * @param {number} urlHash 
  * @param {number} urlVer 
  */
-export async function proxy(urlHash, urlVer) {
+async function proxyMain(urlHash, urlVer) {
   const hashHex = util.numToHex(urlHash, 8)
   const res = await fetch(CDN + urlVer + '/' + hashHex + '.txt')
   if (res.status !== 200) {
@@ -67,7 +67,20 @@ export async function proxy(urlHash, urlVer) {
   hdrObj['date'] = new Date().toUTCString()
 
   return new Response(body, {
-    status: 200,
     headers: hdrObj
   })
+}
+
+
+/**
+ * @param {number} urlHash 
+ * @param {number} urlVer 
+ */
+export async function proxy(urlHash, urlVer) {
+  // TODO: 使用多个 CDN
+  try {
+    return await proxyMain(urlHash, urlVer)
+  } catch(err) {
+    console.warn('cdn fail:', err)
+  }
 }

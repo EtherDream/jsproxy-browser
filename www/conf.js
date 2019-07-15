@@ -1,11 +1,11 @@
 jsproxy_config({
   // 当前配置的版本（记录在日志中，用于排查问题）
-  ver: '82',
+  ver: '91',
 
   // 通过 CDN 加速常用网站的静态资源（实验中）
   static_boost: {
     enable: true,
-    ver: 28
+    ver: 38
   },
 
   // 节点配置

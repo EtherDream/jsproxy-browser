@@ -96,3 +96,8 @@ export function numToHex(num, len) {
 export async function sleep(ms) {
   return new Promise(y => setTimeout(y, ms))
 }
+
+
+export function getTimeStamp() {
+  return (Date.now() / 1000) | 0
+}

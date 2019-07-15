@@ -180,6 +180,48 @@ async function getUrlByClientId(id) {
 }
 
 
+const ERR_MSG_MAP = {
+  'ORIGIN_NOT_ALLOWED': '当前域名不在服务器外链白名单',
+  'CIRCULAR_DEPENDENCY': '当前请求出现循环代理'
+}
+
+/**
+ * 
+ * @param {string} jsonStr 
+ * @param {number} status 
+ * @param {URL} urlObj 
+ */
+function parseGatewayError(jsonStr, status, urlObj) {
+  let ret = ''
+  const jsonObj = JSON.parse(jsonStr)
+  const msg = jsonObj['msg']
+  const addr = jsonObj['addr']
+
+  switch (status) {
+  case 200:
+    ret = ERR_MSG_MAP[msg] || ''
+    break
+  case 500:
+    ret = '代理服务器内部错误'
+    break
+  case 502:
+    if (addr) {
+      ret = `无法连接 ${urlObj.origin} (${addr})`
+    } else {
+      ret = `无法解析 ${urlObj.origin}`
+    }
+    break
+  case 504:
+    ret = `连接超时 ${urlObj.origin}`
+    if (addr) {
+      ret += ` (${addr})`
+    }
+    break
+  }
+  return makeHtmlRes(ret)
+}
+
+
 /**
  * @param {Request} req 
  * @param {URL} urlObj
@@ -188,14 +230,41 @@ async function getUrlByClientId(id) {
  * @returns {Promise<Response>}
  */
 async function forward(req, urlObj, cliUrlObj, redirNum) {
-  const {
+  let {
     res, status, headers, cookies
   } = await network.launch(req, urlObj, cliUrlObj)
+
+  if (!res) {
+    return makeHtmlRes('load fail')
+  }
 
   if (cookies) {
     sendMsgToPages(MSG.SW_COOKIE_PUSH, cookies)
   }
 
+  if (!status) {
+    status = res.status || 200
+  }
+
+  let headersMutable = true
+  if (!headers) {
+    headers = res.headers
+    headersMutable = false
+  }
+
+  /**
+   * @param {string} k 
+   * @param {string} v 
+   */
+  const setHeader = (k, v) => {
+    if (!headersMutable) {
+      headers = new Headers(headers)
+      headersMutable = true
+    }
+    headers.set(k, v)
+  }
+
+  /** @type {ResponseInit} */
   const resOpt = {status, headers}
 
   // 空响应
@@ -221,16 +290,22 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
       // 跟随模式，返回最终数据
       if (req.redirect === 'follow') {
         if (++redirNum === MAX_REDIR) {
-          return makeHtmlRes('too many redirects', 500)
+          return makeHtmlRes('重定向过多', 500)
         }
         return forward(req, locObj, cliUrlObj, redirNum)
       }
       // 不跟随模式（例如页面跳转），返回 30X 状态
-      headers.set('location', urlx.encUrlObj(locObj))
+      setHeader('location', urlx.encUrlObj(locObj))
     }
 
     // firefox, safari 保留内容会提示页面损坏
     return new Response(null, resOpt)
+  }
+
+  // 网关错误
+  const gwErr = headers.get('gateway-err--')
+  if (gwErr) {
+    return parseGatewayError(gwErr, status, urlObj)
   }
 
   //
@@ -252,7 +327,7 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
     const buf = await res.arrayBuffer()
     const ret = processJs(buf, charset)
 
-    headers.set('content-type', 'text/javascript')
+    setHeader('content-type', 'text/javascript')
     return new Response(ret, resOpt)
   }
 
@@ -280,7 +355,7 @@ async function proxy(e, urlObj) {
     return await forward(e.request, urlObj, cliUrlObj, 0)
   } catch (err) {
     console.error(err)
-    return makeHtmlRes(err.stack, 500)
+    return makeHtmlRes('前端脚本错误<br><pre>' + err.stack + '</pre>', 500)
   }
 }
 
@@ -301,8 +376,8 @@ async function onFetch(e) {
     return makeHtmlRes(res.body)
   }
 
-  // 配置（例如 https://zjcqoo.github.io/conf.js）
-  if (urlStr === path.CONF) {
+  // 图标、配置（例如 https://zjcqoo.github.io/conf.js）
+  if (urlStr === path.CONF || urlStr === path.ICON) {
     return fetch(urlStr)
   }
 

@@ -29,10 +29,20 @@ function isLocalhost(host) {
 
 
 /**
+ * @param {string} host 
+ * @param {string} scheme 
+ */
+export function genUrl(host, scheme) {
+  const s = isLocalhost(host) ? '' : 's'
+  return `${scheme}${s}://${host}/${scheme}`
+}
+
+
+/**
  * @param {number} urlHash 
  * @param {number} level 
  */
-export function genHttpUrl(urlHash, level) {
+export function getHost(urlHash, level) {
   let node = mConf.node_default
 
   // 实验中...
@@ -40,10 +50,13 @@ export function genHttpUrl(urlHash, level) {
     node = mConf.node_acc
   }
 
-  let host = getHostByNodeId(urlHash, node)
-  const s = isLocalhost(host) ? '' : 's'
-  return `http${s}://${host}/http`
+  return getHostByNodeId(urlHash, node)
 }
+
+
+// export function setFailHost(host) {
+
+// }
 
 
 /**
@@ -70,8 +83,7 @@ export function genWsUrl(urlObj, args) {
 
   const urlHash = util.strHash(urlObj.href)
   const host = getHostByNodeId(urlHash, mConf.node_default)
-  const s = isLocalhost(host) ? '' : 's'
-  return `ws${s}://${host}/ws?` + new URLSearchParams(args)
+  return genUrl(host, 'ws')
 }
 
 

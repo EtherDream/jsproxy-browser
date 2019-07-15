@@ -214,9 +214,9 @@ function getAliasUrl(alias) {
   if (!aliasDomainMap) {
     aliasDomainMap = new Map()
     for (const [domain, aliasArr] of Object.entries(DEFAULT_ALIAS)) {
-      aliasArr.forEach(alias => {
-        aliasDomainMap.set(alias, domain)
-      })
+      for (const v of aliasArr) {
+        aliasDomainMap.set(v, domain)
+      }
     }
   }
   

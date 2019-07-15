@@ -2,6 +2,7 @@
 export const ROOT = getRootPath() 
 export const HOME = ROOT + 'index.html'
 export const CONF = ROOT + 'conf.js'
+export const ICON = ROOT + 'favicon.ico'
 export const HELPER = ROOT + '__sys__/helper.js'
 export const ASSETS = ROOT + '__sys__/assets/'
 export const PREFIX = ROOT + '-----'
