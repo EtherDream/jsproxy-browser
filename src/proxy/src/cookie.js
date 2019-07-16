@@ -1,4 +1,4 @@
-import Database from './database.js'
+import {Database} from './database.js'
 
 
 function Cookie() {

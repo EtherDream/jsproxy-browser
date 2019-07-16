@@ -7,8 +7,6 @@ import * as cdn from './cdn.js'
 import {Database} from './database.js'
 
 
-const CACHE_TIME = 3600 * 24 * 7
-
 const REFER_ORIGIN = location.origin + '/'
 const ENABLE_3RD_COOKIE = true
 
@@ -56,11 +54,12 @@ async function getUrlCache(url) {
 /**
  * @param {string} url 
  * @param {string} host 
+ * @param {string} info 
  * @param {number} expires 
  */
-async function setUrlCache(url, host, expires) {
+async function setUrlCache(url, host, info, expires) {
   mDB || await initDB()
-  await mDB.put({url, host, expires})
+  await mDB.put({url, host, info, expires})
 }
 
 
@@ -92,6 +91,34 @@ function getReqCookie(targetUrlObj, clientUrlObj, req) {
     }
   }
   return cookie.concat(targetUrlObj)
+}
+
+
+/**
+ * @param {Headers} header 
+ */
+function parseResCache(header) {
+  const cacheStr = header.get('cache-control')
+  if (cacheStr) {
+    if (/no-cache/i.test(cacheStr)) {
+      return -1
+    }
+    const m = cacheStr.match(/(?:^|,\s*)max-age=["]?(\d+)/i)
+    if (m) {
+      const sec = +m[1]
+      if (sec > 0) {
+        return sec
+      }
+    }
+  }
+  const expires = header.get('expires')
+  if (expires) {
+    const ts = Date.parse(expires)
+    if (ts > 0) {
+      return (ts - Date.now()) / 1000 | 0
+    }
+  }
+  return 0
 }
 
 
@@ -245,9 +272,8 @@ function initReqHdr(req, urlObj, cliUrlObj) {
  * 直连的资源
  * 
  * @param {string} url 
- * @param {Request} req 
  */
-async function proxyDirect(url, req) {
+async function proxyDirect(url) {
   try {
     const res = await fetch(url, {
       referrerPolicy: 'no-referrer',
@@ -314,23 +340,21 @@ export async function launch(req, urlObj, cliUrlObj) {
     // 该资源是否加载过？
     const r = await getUrlCache(url)
     if (r && r.host) {
-      const now = util.getTimeStamp()
+      const now = util.getTimeSeconds()
       if (now < r.expires) {
         // 使用之前的节点，提高缓存命中率
         host = r.host
         rawInfo = r.info
         break
-      } else {
-        /*await*/ delUrlCache(url)
       }
     }
 
     // 支持 CORS 的站点，可直连
     if (mDirectHostSet.has(urlObj.host)) {
       console.log('direct hit:', url)
-      const res = await proxyDirect(url, req)
+      const res = await proxyDirect(url)
       if (res) {
-        setUrlCache(url, '', 0)
+        setUrlCache(url, '', '', 0)
         return {res}
       }
     }
@@ -341,7 +365,7 @@ export async function launch(req, urlObj, cliUrlObj) {
       console.log('cdn hit:', url)
       const res = await cdn.proxy(urlHash, ver)
       if (res) {
-        setUrlCache(url, '', 0)
+        setUrlCache(url, '', '', 0)
         return {res}
       }
     }
@@ -349,9 +373,10 @@ export async function launch(req, urlObj, cliUrlObj) {
     break
   }
 
+  // TODO: 此处逻辑需要优化
   let level = 1
 
-  // 之前已加载过，服务器
+  // 如果缓存未命中产生请求，服务器不做节点切换
   if (host) {
     level = 0
   }
@@ -364,7 +389,9 @@ export async function launch(req, urlObj, cliUrlObj) {
 
 
   for (let i = 0; i < MAX_RETRY; i++) {
-    if (!host) {
+    if (i === 0 && host) {
+      // 使用缓存的主机
+    } else {
       host = route.getHost(urlHash, level)
     }
     const proxyUrl = route.genUrl(host, 'http')
@@ -387,15 +414,6 @@ export async function launch(req, urlObj, cliUrlObj) {
     }
     resHdr = res.headers
 
-    // 目前只有加速节点会返回该信息
-    const resErr = resHdr.get('--error')
-    if (resErr) {
-      console.warn('[jsproxy] proxy fail:', resErr)
-      rawInfo = ''
-      level = 0
-      continue
-    }
-
     // 检测浏览器是否支持 aceh: *
     if (mIsAcehOld && resHdr.has('--t')) {
       mIsAcehOld = false
@@ -409,6 +427,15 @@ export async function launch(req, urlObj, cliUrlObj) {
       continue
     }
 
+    // 目前只有加速节点会返回该信息
+    const resErr = resHdr.get('--error')
+    if (resErr) {
+      console.warn('[jsproxy] cfworker fail:', resErr)
+      rawInfo = ''
+      level = 0
+      continue
+    }
+
     break
   }
 
@@ -416,12 +443,18 @@ export async function launch(req, urlObj, cliUrlObj) {
     return
   }
 
-  setUrlCache(url, host, util.getTimeStamp() + CACHE_TIME)
-
   const {
     status, headers, cookieStrArr
   } = getResInfo(res)
 
+
+  if (method === 'GET') {
+    const cacheSec = parseResCache(headers)
+    if (cacheSec >= 0) {
+      const expires = util.getTimeSeconds() + cacheSec + 1000
+      setUrlCache(url, host, rawInfo, expires)
+    }
+  }
 
   // 处理 HTTP 返回头的 refresh 字段
   // http://www.otsukare.info/2015/03/26/refresh-http-header

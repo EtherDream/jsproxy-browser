@@ -16,9 +16,8 @@ export class Database {
    * @param {IDBTransactionMode} mode 
    */
   _getStore(mode) {
-    return this._db
-      .transaction(this._table, mode)
-      .objectStore(this._table)
+    let t = this._db.transaction(this._table, mode)
+    return t.objectStore(this._table)
   }
 
 
@@ -26,24 +25,23 @@ export class Database {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(this._name)
 
-      req.onsuccess = () => {
-        this._db = req.result
+      req.onsuccess = (e) => {
+        const idb = req.result
+        this._db = idb
+
+        idb.onclose = (e) => {
+          console.warn('[jsproxy] indexedDB disconnected, reopen...')
+          this.open(opt)
+        }
         resolve()
       }
-      req.onerror = () => {
+      req.onerror = (e) => {
+        console.warn('req.onerror:', e)
         reject(req.error)
       }
-      req.onupgradeneeded = () => {
+      req.onupgradeneeded = (e) => {
         const idb = req.result
-        const obj = idb.createObjectStore(this._table, opt)
-        const t = obj.transaction
-        t.oncomplete = () => {
-          this._db = idb
-          resolve()
-        }
-        t.onerror = () => {
-          reject(t.error)
-        }
+        idb.createObjectStore(this._table, opt)
       }
     })
   }
@@ -59,10 +57,10 @@ export class Database {
       const obj = this._getStore('readonly')
       const req = obj.get(key)
 
-      req.onsuccess = () => {
+      req.onsuccess = (e) => {
         resolve(req.result)
       }
-      req.onerror = () => {
+      req.onerror = (e) => {
         reject(req.error)
       }
     })
@@ -74,10 +72,10 @@ export class Database {
       const obj = this._getStore('readwrite')
       const req = obj.put(record)
 
-      req.onsuccess = () => {
+      req.onsuccess = (e) => {
         resolve()
       }
-      req.onerror = () => {
+      req.onerror = (e) => {
         reject(req.error)
       }
     })
@@ -89,10 +87,10 @@ export class Database {
       const obj = this._getStore('readwrite')
       const req = obj.delete(key)
 
-      req.onsuccess = () => {
+      req.onsuccess = (e) => {
         resolve()
       }
-      req.onerror = () => {
+      req.onerror = (e) => {
         reject(req.error)
       }
     })
@@ -107,7 +105,7 @@ export class Database {
       const obj = this._getStore('readonly')
       const req = obj.openCursor(...args)
 
-      req.onsuccess = () => {
+      req.onsuccess = (e) => {
         const {result} = req
         if (result) {
           if (callback(result.value) !== false) {
@@ -117,7 +115,7 @@ export class Database {
           resolve()
         }
       }
-      req.onerror = () => {
+      req.onerror = (e) => {
         reject(req.error)
       }
     })

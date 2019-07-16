@@ -98,6 +98,6 @@ export async function sleep(ms) {
 }
 
 
-export function getTimeStamp() {
+export function getTimeSeconds() {
   return (Date.now() / 1000) | 0
 }

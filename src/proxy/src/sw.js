@@ -206,13 +206,13 @@ function parseGatewayError(jsonStr, status, urlObj) {
     break
   case 502:
     if (addr) {
-      ret = `无法连接 ${urlObj.origin} (${addr})`
+      ret = `代理服务器无法连接网站 ${urlObj.origin} (${addr})`
     } else {
-      ret = `无法解析 ${urlObj.origin}`
+      ret = `代理服务器无法解析域名 ${urlObj.host}`
     }
     break
   case 504:
-    ret = `连接超时 ${urlObj.origin}`
+    ret = `代理服务器连接网站超时 ${urlObj.origin}`
     if (addr) {
       ret += ` (${addr})`
     }
@@ -230,13 +230,13 @@ function parseGatewayError(jsonStr, status, urlObj) {
  * @returns {Promise<Response>}
  */
 async function forward(req, urlObj, cliUrlObj, redirNum) {
-  let {
-    res, status, headers, cookies
-  } = await network.launch(req, urlObj, cliUrlObj)
-
-  if (!res) {
+  const r = await network.launch(req, urlObj, cliUrlObj)
+  if (!r) {
     return makeHtmlRes('load fail')
   }
+  let {
+    res, status, headers, cookies
+  } = r
 
   if (cookies) {
     sendMsgToPages(MSG.SW_COOKIE_PUSH, cookies)
