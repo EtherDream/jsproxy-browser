@@ -198,7 +198,7 @@ function parseGatewayError(jsonStr, status, urlObj) {
   const addr = jsonObj['addr']
 
   switch (status) {
-  case 200:
+  case 204:
     ret = ERR_MSG_MAP[msg] || ''
     break
   case 500:
@@ -264,6 +264,12 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
     headers.set(k, v)
   }
 
+  // 网关错误
+  const gwErr = headers.get('gateway-err--')
+  if (gwErr) {
+    return parseGatewayError(gwErr, status, urlObj)
+  }
+
   /** @type {ResponseInit} */
   const resOpt = {status, headers}
 
@@ -300,12 +306,6 @@ async function forward(req, urlObj, cliUrlObj, redirNum) {
 
     // firefox, safari 保留内容会提示页面损坏
     return new Response(null, resOpt)
-  }
-
-  // 网关错误
-  const gwErr = headers.get('gateway-err--')
-  if (gwErr) {
-    return parseGatewayError(gwErr, status, urlObj)
   }
 
   //

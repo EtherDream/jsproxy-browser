@@ -448,7 +448,7 @@ export async function launch(req, urlObj, cliUrlObj) {
   } = getResInfo(res)
 
 
-  if (method === 'GET') {
+  if (method === 'GET' && status === 200) {
     const cacheSec = parseResCache(headers)
     if (cacheSec >= 0) {
       const expires = util.getTimeSeconds() + cacheSec + 1000
