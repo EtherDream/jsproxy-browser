@@ -324,14 +324,15 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
     getter => function() {
       // console.log('[jsproxy] get document.cookie')
       const {ori} = env.get(this)
-      return cookie.concat(ori)
+      return cookie.query(ori)
     },
     setter => function(val) {
       // console.log('[jsproxy] set document.cookie:', val)
       const {ori} = env.get(this)
-      const ret = cookie.parse(val, ori)
-      if (ret) {
-        sendMsgToSw(MSG.PAGE_COOKIE_PUSH, ret)
+      const item = cookie.parse(val, ori, Date.now())
+      if (item) {
+        cookie.set(item)
+        sendMsgToSw(MSG.PAGE_COOKIE_PUSH, item)
       }
     }
   )

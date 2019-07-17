@@ -34,20 +34,17 @@ export function setConf(conf) {
 }
 
 
-async function initDB() {
-  mDB = new Database('sys', 'url-cache')
-  await mDB.open({
-    keyPath: 'url'
-  })
+export async function setDB(db) {
+  mDB = db
+  // clear expires
 }
 
 
 /**
  * @param {string} url 
  */
-async function getUrlCache(url) {
-  mDB || await initDB()
-  return await mDB.query(url)
+function getUrlCache(url) {
+  return mDB.get('url-cache', url)
 }
 
 
@@ -58,8 +55,7 @@ async function getUrlCache(url) {
  * @param {number} expires 
  */
 async function setUrlCache(url, host, info, expires) {
-  mDB || await initDB()
-  await mDB.put({url, host, info, expires})
+  await mDB.put('url-cache', {url, host, info, expires})
 }
 
 
@@ -67,8 +63,7 @@ async function setUrlCache(url, host, info, expires) {
  * @param {string} url 
  */
 async function delUrlCache(url) {
-  mDB || await initDB()
-  await mDB.delete(url)
+  await mDB.delete('url-cache', url)
 }
 
 
@@ -90,7 +85,7 @@ function getReqCookie(targetUrlObj, clientUrlObj, req) {
       return ''
     }
   }
-  return cookie.concat(targetUrlObj)
+  return cookie.query(targetUrlObj)
 }
 
 
@@ -135,9 +130,21 @@ function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
       return
     }
   }
-  return cookieStrArr
-    .map(str => cookie.parse(str, urlObj))
-    .filter(item => item && !item.httpOnly)
+
+  const ret = []
+  const now = Date.now()
+
+  for (const str of cookieStrArr) {
+    const item = cookie.parse(str, urlObj, now)
+    if (!item) {
+      continue
+    }
+    cookie.set(item)
+    if (!item.httpOnly) {
+      ret.push(item)
+    }
+  }
+  return ret
 }
 
 

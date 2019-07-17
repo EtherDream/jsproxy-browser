@@ -1,27 +1,28 @@
 export class Database {
   /**
    * @param {string} name 
-   * @param {string} table 
    */
-  constructor(name, table) {
+  constructor(name) {
     this._name = name
-    this._table = table
 
     /** @type {IDBDatabase} */
     this._db = null
   }
 
-
   /**
+   * @param {string} table 
    * @param {IDBTransactionMode} mode 
    */
-  _getStore(mode) {
-    let t = this._db.transaction(this._table, mode)
-    return t.objectStore(this._table)
+  _getStore(table, mode) {
+    return this._db
+      .transaction(table, mode)
+      .objectStore(table)
   }
 
-
-  open(opt) {
+  /**
+   * @param {Object<string, IDBObjectStoreParameters>} opts 
+   */
+  open(opts) {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(this._name)
 
@@ -31,7 +32,7 @@ export class Database {
 
         idb.onclose = (e) => {
           console.warn('[jsproxy] indexedDB disconnected, reopen...')
-          this.open(opt)
+          this.open(opts)
         }
         resolve()
       }
@@ -41,7 +42,9 @@ export class Database {
       }
       req.onupgradeneeded = (e) => {
         const idb = req.result
-        idb.createObjectStore(this._table, opt)
+        for (const [k, v] of Object.entries(opts)) {
+          idb.createObjectStore(k, v)
+        }
       }
     })
   }
@@ -51,10 +54,13 @@ export class Database {
     this._db.close()
   }
 
-
-  query(key) {
+  /**
+   * @param {string} table 
+   * @param {any} key 
+   */
+  get(table, key) {
     return new Promise((resolve, reject) => {
-      const obj = this._getStore('readonly')
+      const obj = this._getStore(table, 'readonly')
       const req = obj.get(key)
 
       req.onsuccess = (e) => {
@@ -66,10 +72,13 @@ export class Database {
     })
   }
 
-
-  put(record) {
+  /**
+   * @param {string} table 
+   * @param {any} record 
+   */
+  put(table, record) {
     return new Promise((resolve, reject) => {
-      const obj = this._getStore('readwrite')
+      const obj = this._getStore(table, 'readwrite')
       const req = obj.put(record)
 
       req.onsuccess = (e) => {
@@ -81,10 +90,13 @@ export class Database {
     })
   }
 
-
-  delete(key) {
+  /**
+   * @param {string} table 
+   * @param {any} key 
+   */
+  delete(table, key) {
     return new Promise((resolve, reject) => {
-      const obj = this._getStore('readwrite')
+      const obj = this._getStore(table, 'readwrite')
       const req = obj.delete(key)
 
       req.onsuccess = (e) => {
@@ -96,13 +108,13 @@ export class Database {
     })
   }
 
-
   /**
+   * @param {string} table 
    * @param {(any) => boolean} callback 
    */
-  enum(callback, ...args) {
+  enum(table, callback, ...args) {
     return new Promise((resolve, reject) => {
-      const obj = this._getStore('readonly')
+      const obj = this._getStore(table, 'readonly')
       const req = obj.openCursor(...args)
 
       req.onsuccess = (e) => {

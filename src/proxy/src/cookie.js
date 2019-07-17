@@ -1,7 +1,11 @@
 import {Database} from './database.js'
 
+/** @type {Set<Cookie>} */
+let mDirtySet = new Set()
+
 
 function Cookie() {
+  this.id = ''
   this.name = ''
   this.value = ''
   this.domain = ''
@@ -19,6 +23,7 @@ function Cookie() {
  * @param {Cookie} dst 
  */
 function copy(dst, src) {
+  dst.id = src.id
   dst.name = src.name
   dst.value = src.value
   dst.domain = src.domain
@@ -125,11 +130,11 @@ export function getNonHttpOnlyItems() {
 /**
  * @param {string} str 
  * @param {URL} urlObj 
+ * @param {number} now 
  */
-export function parse(str, urlObj) {
+export function parse(str, urlObj, now) {
   const item = new Cookie()
   const arr = str.split(';')
-  const now = Date.now()
 
   for (let i = 0; i < arr.length; i++) {
     let key, val
@@ -242,19 +247,12 @@ export function parse(str, urlObj) {
     item.path = path
   }
 
-  set(item)
-  return item
-}
-
-
-/**
- * @param {Cookie} item
- */
-function getCookieId(item) {
-  return (item.secure ? ';' : '') +
+  item.id = (item.secure ? ';' : '') +
     item.name + ';' +
     item.domain +
     item.path
+
+  return item
 }
 
 
@@ -263,7 +261,7 @@ function getCookieId(item) {
  */
 export function set(item) {
   // console.log('set:', item)
-  const id = getCookieId(item)
+  const id = item.id
   const matched = mIdCookieMap.get(id)
 
   if (matched) {
@@ -271,9 +269,12 @@ export function set(item) {
       // delete
       mIdCookieMap.delete(id)
       matched.isExpired = true
+      // TODO: remove node
     } else {
+      // update
       copy(matched, item)
     }
+    mDirtySet.add(matched)
   } else {
     // create
     const labels = item.domain.split('.')
@@ -285,6 +286,8 @@ export function set(item) {
   
     node.addCookie(item)
     mIdCookieMap.set(id, item)
+
+    mDirtySet.add(item)
   }
 }
 
@@ -292,17 +295,17 @@ export function set(item) {
 /**
  * @param {URL} urlObj 
  */
-export function concat(urlObj) {
+export function query(urlObj) {
   const ret = []
   const now = Date.now()
   const domain = urlObj.hostname
   const path = urlObj.pathname
   const isHttps = (urlObj.protocol === 'https:')
 
-
   const labels = domain.split('.')
   let labelPos = labels.length
   let node = mCookieNodeRoot
+
   do {
     node = node.getChild(labels[--labelPos])
     if (!node) {
@@ -320,18 +323,21 @@ export function concat(urlObj) {
       //   ✘       |   ✘         |   ✔
       //   ✘       |   ✔         |   ✘
       if (!isHttps && item.secure) {
-        break
+        continue
       }
       // HostOnly Cookie 需匹配完整域名
       if (item.hostOnly && labelPos !== 0) {
-        break
+        continue
       }
       if (!isSubPath(item.path, path)) {
-        break
+        continue
+      }
+      if (item.isExpired) {
+        continue
       }
       if (isExpire(item, now)) {
         item.isExpired = true
-        break
+        continue
       }
       // TODO: same site
 
@@ -344,4 +350,43 @@ export function concat(urlObj) {
   } while (labelPos !== 0)
 
   return ret.join('; ')
+}
+
+
+/** @type {Database} */
+let mDB
+
+export async function setDB(db) {
+  mDB = db
+
+  const now = Date.now()
+  await mDB.enum('cookie', v => {
+    if (isExpire(v, now)) {
+      mDB.delete('cookie', v.id)
+    } else {
+      set(v)
+    }
+    return true
+  })
+
+  setInterval(save, 1000 * 10)
+}
+
+
+export async function save() {
+  if (mDirtySet.size === 0) {
+    return
+  }
+
+  const tmp = mDirtySet
+  mDirtySet = new Set()
+
+  for (const item of tmp) {
+    if (item.isExpired) {
+debugger
+      await mDB.delete('cookie', item.id)
+    } else {
+      await mDB.put('cookie', item)
+    }
+  }
 }

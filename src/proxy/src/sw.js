@@ -7,6 +7,7 @@ import * as network from './network.js'
 import * as MSG from './msg.js'
 import * as jsfilter from './jsfilter.js'
 import * as inject from './inject.js'
+import {Database} from './database.js'
 
 
 const CONF_UPDATE_TIMER = 1000 * 60 * 5
@@ -359,6 +360,24 @@ async function proxy(e, urlObj) {
   }
 }
 
+/** @type {Database} */
+let mDB
+
+async function initDB() {
+  mDB = new Database('sys')
+  await mDB.open({
+    'url-cache': {
+      keyPath: 'url'
+    },
+    'cookie': {
+      keyPath: 'id'
+    }
+  })
+
+  await network.setDB(mDB)
+  await cookie.setDB(mDB)
+}
+
 
 /**
  * @param {FetchEvent} e 
@@ -366,6 +385,10 @@ async function proxy(e, urlObj) {
 async function onFetch(e) {
   if (!mConf) {
     await initConf()
+  }
+  // TODO: 逻辑优化
+  if (!mDB) {
+    await initDB()
   }
   const req = e.request
   const urlStr = urlx.delHash(req.url)

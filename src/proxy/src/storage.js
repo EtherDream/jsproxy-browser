@@ -1,6 +1,6 @@
-import {
-  func as hookFunc,
-} from './hook.js'
+import * as hook from './hook.js'
+import * as urlx from './urlx.js'
+
 
 const {
   apply,
@@ -35,9 +35,7 @@ function setup(win, name, prefix) {
     toString: () => raw.toString(),
     [Symbol.toStringTag]: 'Storage',
     get length() {
-      return ownKeys(raw)
-        .filter(v => v.startsWith(prefix))
-        .length
+      return getAllKeys().length
     },
   }
   
@@ -86,13 +84,19 @@ function setup(win, name, prefix) {
    * @returns {string[]}
    */
   function getAllKeys() {
-    return ownKeys(raw)
-      .filter(v => {
-        if (typeof v === 'string') {
-          return v.startsWith(prefix)
-        }
-      })
-      .map(v => v.substr(prefixLen))
+    const ret = []
+    const keys = ownKeys(raw)
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i]
+      if (typeof key !== 'string') {
+        continue
+      }
+      if (!key.startsWith(prefix)) {
+        continue
+      }
+      ret.push(key.substr(prefixLen))
+    }
+    return ret
   }
 
   const storage = new Proxy(raw, {
@@ -119,11 +123,15 @@ function setup(win, name, prefix) {
     },
     deleteProperty(obj, key) {
       console.log('[jsproxy] %s del: %s', name, key)
-      return removeItem(key)
+      removeItem(key)
+      return true
     },
     has(obj, key) {
       console.log('[jsproxy] %s has: %s', name, key)
-      return (prefix + key) in raw
+      if (typeof key === 'string') {
+        return (prefix + key) in obj
+      }
+      return false
     },
     // enumerate(obj) {
     //   console.log('[jsproxy] %s enumerate: %s', name)
@@ -139,7 +147,9 @@ function setup(win, name, prefix) {
     // },
     getOwnPropertyDescriptor(obj, key) {
       // console.log('[jsproxy] %s getOwnPropertyDescriptor: %s', name, key)
-      return getOwnPropertyDescriptor(raw, prefix + key)
+      if (typeof key === 'string') {
+        return getOwnPropertyDescriptor(raw, prefix + key)
+      }
     }
   })
 
@@ -154,11 +164,29 @@ function setup(win, name, prefix) {
 export function createStorage(global, origin) {
   const prefix = origin + ':'
 
+  function noPrefixGetter(oldFn) {
+    return function() {
+      const val = oldFn.call(this)
+      return val.substr(prefix.length)
+    }
+  }
+
   //
   // Web Storage
   //
   setup(global, 'localStorage', prefix)
   setup(global, 'sessionStorage', prefix)
+
+  const StorageEventProto = global['StorageEvent'].prototype
+
+  hook.prop(StorageEventProto, 'key', noPrefixGetter)
+  hook.prop(StorageEventProto, 'url',
+    getter => function() {
+      const val = getter.call(this)
+      return urlx.decUrlStrAbs(val)
+    }
+  )
+  // TODO: StorageEventProto.storageArea
 
   //
   // Storage API
@@ -173,13 +201,16 @@ export function createStorage(global, origin) {
   }
 
   // indexedDB
-  const idbProto = global['IDBFactory'].prototype
-  hookFunc(idbProto, 'open', dbOpenHook)
+  const IDBFactoryProto = global['IDBFactory'].prototype
+  hook.func(IDBFactoryProto, 'open', dbOpenHook)
+
+  const IDBDatabaseProto = global['IDBDatabase'].prototype
+  hook.prop(IDBDatabaseProto, 'name', noPrefixGetter)
 
   // Cache Storage
   const cacheStorageProto = global['CacheStorage'].prototype
-  hookFunc(cacheStorageProto, 'open', dbOpenHook)
+  hook.func(cacheStorageProto, 'open', dbOpenHook)
 
   // WebSQL
-  hookFunc(global, 'openDatabase', dbOpenHook)
+  hook.func(global, 'openDatabase', dbOpenHook)
 }
