@@ -369,7 +369,7 @@ export async function setDB(db) {
     return true
   })
 
-  setInterval(save, 1000 * 10)
+  setInterval(save, 1000 * 3)
 }
 
 
@@ -383,7 +383,6 @@ export async function save() {
 
   for (const item of tmp) {
     if (item.isExpired) {
-debugger
       await mDB.delete('cookie', item.id)
     } else {
       await mDB.put('cookie', item)

@@ -364,7 +364,7 @@ async function proxy(e, urlObj) {
 let mDB
 
 async function initDB() {
-  mDB = new Database('sys')
+  mDB = new Database('.sys')
   await mDB.open({
     'url-cache': {
       keyPath: 'url'
@@ -490,8 +490,8 @@ function updateConf(conf, force) {
 
 
 async function readConf() {
-  const cache = await caches.open("sys")
-  const req = new Request("/conf.json")
+  const cache = await caches.open('.sys')
+  const req = new Request('/conf.json')
   const res = await cache.match(req)
   if (res) {
     return res.json()
@@ -500,8 +500,8 @@ async function readConf() {
 
 async function saveConf(conf) {
   const json = JSON.stringify(conf)
-  const cache = await caches.open("sys")
-  const req = new Request("/conf.json")
+  const cache = await caches.open('.sys')
+  const req = new Request('/conf.json')
   const res = new Response(json);
   return cache.put(req, res)
 }

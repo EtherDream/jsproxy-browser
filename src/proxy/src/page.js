@@ -99,7 +99,7 @@ export function init(win) {
   // 该 window 之前已初始化过，现在只需更新 document。
   // 例如 iframe 加载完成之前，读取 contentWindow 得到的是空白页，
   // 加载完成后，document 对象会变化，但 window 上的属性仍保留。
-  const info = env.get(win.Math)
+  const info = env.get(win['Math'])
   if (info) {
     const {doc, domHook} = info
     if (doc !== document) {
@@ -207,7 +207,7 @@ export function init(win) {
   //
   // hook ServiceWorker
   //
-  const swProto = win.ServiceWorkerContainer.prototype
+  const swProto = win['ServiceWorkerContainer'].prototype
   if (swProto) {
     hook.func(swProto, 'register', oldFn => function() {
       console.warn('access serviceWorker.register blocked')
@@ -228,7 +228,7 @@ export function init(win) {
    * @param {string} name 
    */
   function hookHistory(name) {
-    const proto = win.History.prototype
+    const proto = win['History'].prototype
 
     hook.func(proto, name, oldFn =>
     /**
@@ -279,6 +279,7 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   //
   const frames = win.frames
 
+  // @ts-ignore
   win.frames = new Proxy(frames, {
     get(_, key) {
       if (typeof key === 'number') {
@@ -302,7 +303,7 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   //
   // hook document.domain
   //
-  const docProto = win.Document.prototype
+  const docProto = win['Document'].prototype
   let domain = oriUrlObj.hostname
 
   hook.prop(docProto, 'domain',
@@ -349,12 +350,12 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   hook.prop(docProto, 'URL', getUriHook)
   hook.prop(docProto, 'documentURI', getUriHook)
 
-  const nodeProto = win.Node.prototype
+  const nodeProto = win['Node'].prototype
   hook.prop(nodeProto, 'baseURI', getUriHook)
 
 
   // hook Message API
-  const msgEventProto = win.MessageEvent.prototype
+  const msgEventProto = win['MessageEvent'].prototype
   hook.prop(msgEventProto, 'origin',
     getter => function() {
       const {ori} = env.get(this)
@@ -376,7 +377,7 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   //
   // hook <meta>
   //
-  const metaProto = win.HTMLMetaElement.prototype
+  const metaProto = win['HTMLMetaElement'].prototype
 
   domHook.attr('META', metaProto,
   {
@@ -439,17 +440,17 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
     })
   }
 
-  const anchorProto = win.HTMLAnchorElement.prototype
+  const anchorProto = win['HTMLAnchorElement'].prototype
   hookAttr('A', anchorProto, 'href')
 
-  const areaProto = win.HTMLAreaElement.prototype
+  const areaProto = win['HTMLAreaElement'].prototype
   hookAttr('AREA', areaProto, 'href')
 
-  const formProto = win.HTMLFormElement.prototype
+  const formProto = win['HTMLFormElement'].prototype
   hookAttr('FORM', formProto, 'action')
 
-  const scriptProto = win.HTMLScriptElement.prototype
-  const linkProto = win.HTMLLinkElement.prototype
+  const scriptProto = win['HTMLScriptElement'].prototype
+  const linkProto = win['HTMLLinkElement'].prototype
 
   // 防止混合内容
   if (oriUrlObj.protocol === 'http:') {
@@ -460,22 +461,22 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   // const imgProto = win.HTMLImageElement.prototype
   // hookAttr('IMG', imgProto, 'src')
 
-  const embedProto = win.HTMLEmbedElement.prototype
+  const embedProto = win['HTMLEmbedElement'].prototype
   hookAttr('EMBED', embedProto, 'src')
 
-  const objectProto = win.HTMLObjectElement.prototype
+  const objectProto = win['HTMLObjectElement'].prototype
   hookAttr('OBJECT', objectProto, 'data')
 
-  const iframeProto = win.HTMLIFrameElement.prototype
+  const iframeProto = win['HTMLIFrameElement'].prototype
   hookAttr('IFRAME', iframeProto, 'src')
 
-  const frameProto = win.HTMLFrameElement.prototype
+  const frameProto = win['HTMLFrameElement'].prototype
   hookAttr('FRAME', frameProto, 'src')
 
 
   // 更新默认的 baseURI
   // https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base#Usage_notes
-  const baseProto = win.HTMLBaseElement.prototype
+  const baseProto = win['HTMLBaseElement'].prototype
   domHook.attr('BASE', baseProto,
   {
     name: 'href',
@@ -561,10 +562,10 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   //  s.innerHTML = '<a href="https://google.com"><img></a>'
   //  s.getElementsByTagName('img')[0].click()
   //
-  const htmlProto = win.HTMLElement.prototype
+  const htmlProto = win['HTMLElement'].prototype
 
   hook.func(htmlProto, 'click', oldFn => function() {
-    /** @type {HTMLElement} */
+    /** @type {HTMLAnchorElement} */
     let el = this
 
     // 添加到文档时已经过 MutationObserver 处理
@@ -579,6 +580,7 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
         el.href = el.href
         break
       }
+      // @ts-ignore
       el = el.parentNode
     }
     return apply(oldFn, this, arguments)

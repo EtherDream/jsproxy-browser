@@ -162,20 +162,29 @@ function setup(win, name, prefix) {
  * @param {string} origin 
  */
 export function createStorage(global, origin) {
-  const prefix = origin + ':'
+  const prefixStr = origin + '$'
+  const prefixLen = prefixStr.length
+
+  function addPrefix(str) {
+    return prefixStr + str
+  }
+
+  function delPrefix(str) {
+    return str.substr(prefixLen)
+  }
 
   function noPrefixGetter(oldFn) {
     return function() {
       const val = oldFn.call(this)
-      return val.substr(prefix.length)
+      return delPrefix(val)
     }
   }
 
   //
   // Web Storage
   //
-  setup(global, 'localStorage', prefix)
-  setup(global, 'sessionStorage', prefix)
+  setup(global, 'localStorage', prefixStr)
+  setup(global, 'sessionStorage', prefixStr)
 
   const StorageEventProto = global['StorageEvent'].prototype
 
@@ -194,7 +203,7 @@ export function createStorage(global, origin) {
   function dbOpenHook(oldFn) {
     return function(name) {
       if (name) {
-        arguments[0] = prefix + name
+        arguments[0] = addPrefix(name)
       }
       return apply(oldFn, this, arguments)
     }
@@ -207,9 +216,45 @@ export function createStorage(global, origin) {
   const IDBDatabaseProto = global['IDBDatabase'].prototype
   hook.prop(IDBDatabaseProto, 'name', noPrefixGetter)
 
+// get all keys
+  hook.func(IDBFactoryProto, 'databases', oldFn => async function() {
+    /** @type {Object[]} */
+    const arr = await apply(oldFn, this, arguments)
+    const ret = []
+    for (const v of arr) {
+      if (v.name[0] === '.') {
+        continue
+      }
+      v.name = delPrefix(v.name)
+      ret.push(v)
+    }
+    return ret
+  })
+
+  hook.func(IDBFactoryProto, 'deleteDatabase', oldFn => function(name) {
+    if (typeof name === 'string') {
+      arguments[0] = addPrefix(name)
+    }
+    return apply(oldFn, this, arguments)
+  })
+
+
   // Cache Storage
   const cacheStorageProto = global['CacheStorage'].prototype
   hook.func(cacheStorageProto, 'open', dbOpenHook)
+
+  // get all keys
+  hook.func(cacheStorageProto, 'keys', oldFn => async function() {
+    /** @type {string[]} */
+    const arr = await apply(oldFn, this, arguments)
+    const ret = []
+    for (const v of arr) {
+      if (v[0] !== '.') {
+        ret.push(delPrefix(v))
+      }
+    }
+    return ret
+  })
 
   // WebSQL
   hook.func(global, 'openDatabase', dbOpenHook)

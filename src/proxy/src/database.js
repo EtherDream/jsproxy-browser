@@ -1,3 +1,6 @@
+import {Signal} from './signal.js'
+
+
 export class Database {
   /**
    * @param {string} name 
@@ -23,30 +26,30 @@ export class Database {
    * @param {Object<string, IDBObjectStoreParameters>} opts 
    */
   open(opts) {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(this._name)
+    const s = new Signal()
+    const req = indexedDB.open(this._name)
 
-      req.onsuccess = (e) => {
-        const idb = req.result
-        this._db = idb
+    req.onsuccess = (e) => {
+      const idb = req.result
+      this._db = idb
 
-        idb.onclose = (e) => {
-          console.warn('[jsproxy] indexedDB disconnected, reopen...')
-          this.open(opts)
-        }
-        resolve()
+      idb.onclose = (e) => {
+        console.warn('[jsproxy] indexedDB disconnected, reopen...')
+        this.open(opts)
       }
-      req.onerror = (e) => {
-        console.warn('req.onerror:', e)
-        reject(req.error)
+      s.notify()
+    }
+    req.onerror = (e) => {
+      console.warn('req.onerror:', e)
+      s.abort(req.error)
+    }
+    req.onupgradeneeded = (e) => {
+      const idb = req.result
+      for (const [k, v] of Object.entries(opts)) {
+        idb.createObjectStore(k, v)
       }
-      req.onupgradeneeded = (e) => {
-        const idb = req.result
-        for (const [k, v] of Object.entries(opts)) {
-          idb.createObjectStore(k, v)
-        }
-      }
-    })
+    }
+    return s.wait()
   }
 
 
@@ -59,17 +62,17 @@ export class Database {
    * @param {any} key 
    */
   get(table, key) {
-    return new Promise((resolve, reject) => {
-      const obj = this._getStore(table, 'readonly')
-      const req = obj.get(key)
+    const s = new Signal()
+    const obj = this._getStore(table, 'readonly')
+    const req = obj.get(key)
 
-      req.onsuccess = (e) => {
-        resolve(req.result)
-      }
-      req.onerror = (e) => {
-        reject(req.error)
-      }
-    })
+    req.onsuccess = (e) => {
+      s.notify(req.result)
+    }
+    req.onerror = (e) => {
+      s.abort(req.error)
+    }
+    return s.wait()
   }
 
   /**
@@ -77,17 +80,17 @@ export class Database {
    * @param {any} record 
    */
   put(table, record) {
-    return new Promise((resolve, reject) => {
-      const obj = this._getStore(table, 'readwrite')
-      const req = obj.put(record)
+    const s = new Signal()
+    const obj = this._getStore(table, 'readwrite')
+    const req = obj.put(record)
 
-      req.onsuccess = (e) => {
-        resolve()
-      }
-      req.onerror = (e) => {
-        reject(req.error)
-      }
-    })
+    req.onsuccess = (e) => {
+      s.notify()
+    }
+    req.onerror = (e) => {
+      s.abort(req.error)
+    }
+    return s.wait()
   }
 
   /**
@@ -95,17 +98,17 @@ export class Database {
    * @param {any} key 
    */
   delete(table, key) {
-    return new Promise((resolve, reject) => {
-      const obj = this._getStore(table, 'readwrite')
-      const req = obj.delete(key)
+    const s = new Signal()
+    const obj = this._getStore(table, 'readwrite')
+    const req = obj.delete(key)
 
-      req.onsuccess = (e) => {
-        resolve()
-      }
-      req.onerror = (e) => {
-        reject(req.error)
-      }
-    })
+    req.onsuccess = (e) => {
+      s.notify()
+    }
+    req.onerror = (e) => {
+      s.abort(req.error)
+    }
+    return s.wait()
   }
 
   /**
@@ -113,23 +116,23 @@ export class Database {
    * @param {(any) => boolean} callback 
    */
   enum(table, callback, ...args) {
-    return new Promise((resolve, reject) => {
-      const obj = this._getStore(table, 'readonly')
-      const req = obj.openCursor(...args)
+    const s = new Signal()
+    const obj = this._getStore(table, 'readonly')
+    const req = obj.openCursor(...args)
 
-      req.onsuccess = (e) => {
-        const {result} = req
-        if (result) {
-          if (callback(result.value) !== false) {
-            result.continue()
-          }
-        } else {
-          resolve()
+    req.onsuccess = (e) => {
+      const {result} = req
+      if (result) {
+        if (callback(result.value) !== false) {
+          result.continue()
         }
+      } else {
+        s.notify()
       }
-      req.onerror = (e) => {
-        reject(req.error)
-      }
-    })
+    }
+    req.onerror = (e) => {
+      s.abort(req.error)
+    }
+    return s.wait()
   }
 }
