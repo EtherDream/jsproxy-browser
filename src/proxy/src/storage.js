@@ -165,9 +165,6 @@ export function createStorage(global, origin) {
   const prefixStr = origin + '$'
   const prefixLen = prefixStr.length
 
-  function addPrefix(str) {
-    return prefixStr + str
-  }
 
   function delPrefix(str) {
     return str.substr(prefixLen)
@@ -200,10 +197,10 @@ export function createStorage(global, origin) {
   //
   // Storage API
   //
-  function dbOpenHook(oldFn) {
+  function addPrefixHook(oldFn) {
     return function(name) {
-      if (name) {
-        arguments[0] = addPrefix(name)
+      if (arguments.length > 0) {
+        arguments[0] = prefixStr + name
       }
       return apply(oldFn, this, arguments)
     }
@@ -211,12 +208,11 @@ export function createStorage(global, origin) {
 
   // indexedDB
   const IDBFactoryProto = global['IDBFactory'].prototype
-  hook.func(IDBFactoryProto, 'open', dbOpenHook)
+  hook.func(IDBFactoryProto, 'open', addPrefixHook)
 
   const IDBDatabaseProto = global['IDBDatabase'].prototype
   hook.prop(IDBDatabaseProto, 'name', noPrefixGetter)
 
-// get all keys
   hook.func(IDBFactoryProto, 'databases', oldFn => async function() {
     /** @type {Object[]} */
     const arr = await apply(oldFn, this, arguments)
@@ -231,19 +227,14 @@ export function createStorage(global, origin) {
     return ret
   })
 
-  hook.func(IDBFactoryProto, 'deleteDatabase', oldFn => function(name) {
-    if (typeof name === 'string') {
-      arguments[0] = addPrefix(name)
-    }
-    return apply(oldFn, this, arguments)
-  })
+  // delete
+  hook.func(IDBFactoryProto, 'deleteDatabase', addPrefixHook)
 
 
   // Cache Storage
   const cacheStorageProto = global['CacheStorage'].prototype
-  hook.func(cacheStorageProto, 'open', dbOpenHook)
+  hook.func(cacheStorageProto, 'open', addPrefixHook)
 
-  // get all keys
   hook.func(cacheStorageProto, 'keys', oldFn => async function() {
     /** @type {string[]} */
     const arr = await apply(oldFn, this, arguments)
@@ -256,6 +247,8 @@ export function createStorage(global, origin) {
     return ret
   })
 
+  hook.func(cacheStorageProto, 'delete', addPrefixHook)
+
   // WebSQL
-  hook.func(global, 'openDatabase', dbOpenHook)
+  hook.func(global, 'openDatabase', addPrefixHook)
 }
