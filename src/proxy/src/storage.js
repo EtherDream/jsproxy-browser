@@ -170,7 +170,7 @@ export function createStorage(global, origin) {
     return str.substr(prefixLen)
   }
 
-  function noPrefixGetter(oldFn) {
+  function delPrefixGetter(oldFn) {
     return function() {
       const val = oldFn.call(this)
       return delPrefix(val)
@@ -185,7 +185,7 @@ export function createStorage(global, origin) {
 
   const StorageEventProto = global['StorageEvent'].prototype
 
-  hook.prop(StorageEventProto, 'key', noPrefixGetter)
+  hook.prop(StorageEventProto, 'key', delPrefixGetter)
   hook.prop(StorageEventProto, 'url',
     getter => function() {
       const val = getter.call(this)
@@ -210,25 +210,24 @@ export function createStorage(global, origin) {
   const IDBFactoryProto = global['IDBFactory'].prototype
   hook.func(IDBFactoryProto, 'open', addPrefixHook)
 
-  const IDBDatabaseProto = global['IDBDatabase'].prototype
-  hook.prop(IDBDatabaseProto, 'name', noPrefixGetter)
-
   hook.func(IDBFactoryProto, 'databases', oldFn => async function() {
-    /** @type {Object[]} */
+    /** @type { {name: string, version: number}[] } */
     const arr = await apply(oldFn, this, arguments)
     const ret = []
     for (const v of arr) {
-      if (v.name[0] === '.') {
-        continue
+      if (v.name[0] !== '.') {
+        v.name = delPrefix(v.name)
+        ret.push(v)
       }
-      v.name = delPrefix(v.name)
-      ret.push(v)
     }
     return ret
   })
 
   // delete
   hook.func(IDBFactoryProto, 'deleteDatabase', addPrefixHook)
+
+  const IDBDatabaseProto = global['IDBDatabase'].prototype
+  hook.prop(IDBDatabaseProto, 'name', delPrefixGetter)
 
 
   // Cache Storage
