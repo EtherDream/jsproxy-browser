@@ -173,7 +173,7 @@ export function createStorage(global, origin) {
   function delPrefixGetter(oldFn) {
     return function() {
       const val = oldFn.call(this)
-      return delPrefix(val)
+      return val && delPrefix(val)
     }
   }
 

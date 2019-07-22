@@ -230,7 +230,6 @@ function initReqHdr(req, urlObj, cliUrlObj) {
     '--url': urlx.delHash(urlObj.href),
     '--mode': req.mode,
     '--type': req.destination || '',
-    '--level': '1',
   })
   const extHdr = {}
   let hasExtHdr = false
@@ -390,6 +389,7 @@ export async function launch(req, urlObj, cliUrlObj) {
 
     res = null
     try {
+      reqHdr.set('--level', level + '')
       res = await fetch(proxyUrl, reqOpt)
     } catch (err) {
       console.warn('fetch fail:', proxyUrl)
@@ -408,7 +408,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     // 是否切换节点
     if (resHdr.has('--switched')) {
       rawInfo = resHdr.get('--raw-info')
-      reqHdr.set('--level', ++level + '')
+      level++
       continue
     }
 
