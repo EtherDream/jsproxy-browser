@@ -555,6 +555,13 @@ origin '${srcUrlObj.origin}' and URL '${srcUrlStr}'.`
   hookAnchorUrlProp(areaProto)
 
 
+  // 该 form 可能没有经过 MutationObserver 处理
+  hook.func(formProto, 'submit', oldFn => function() {
+    this.action = this.action
+    return apply(oldFn, this, arguments)
+  })
+  
+
   //
   // 监控 离屏元素.click() 方式打开页面
   // 例如：

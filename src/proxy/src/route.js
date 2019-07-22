@@ -83,7 +83,7 @@ export function genWsUrl(urlObj, args) {
 
   const urlHash = util.strHash(urlObj.href)
   const host = getHostByNodeId(urlHash, mConf.node_default)
-  return genUrl(host, 'ws')
+  return genUrl(host, 'ws') + '?' + new URLSearchParams(args)
 }
 
 

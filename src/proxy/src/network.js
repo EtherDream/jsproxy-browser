@@ -24,7 +24,6 @@ let mDB
 let mIsAcehOld = true
 
 // TODO:
-let mDirectHostSet = new Set([])
 let mConf
 
 
@@ -275,27 +274,6 @@ function initReqHdr(req, urlObj, cliUrlObj) {
 }
 
 
-/**
- * 直连的资源
- * 
- * @param {string} url 
- */
-async function proxyDirect(url) {
-  try {
-    const res = await fetch(url, {
-      referrerPolicy: 'no-referrer',
-    })
-    const {status} = res
-    if (status === 200 || status === 206) {
-      return res
-    }
-    console.warn('direct status:', status, url)
-  } catch (err) {
-    console.warn('direct fail:', url)
-  }
-}
-
-
 const MAX_RETRY = 5
 
 /**
@@ -357,9 +335,9 @@ export async function launch(req, urlObj, cliUrlObj) {
     }
 
     // 支持 CORS 的站点，可直连
-    if (mDirectHostSet.has(urlObj.host)) {
+    if (cdn.isDirectHost(urlObj.host)) {
       console.log('direct hit:', url)
-      const res = await proxyDirect(url)
+      const res = await cdn.proxyDirect(url)
       if (res) {
         setUrlCache(url, '', '', 0)
         return {res}
@@ -370,7 +348,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     const ver = cdn.getFileVer(urlHash)
     if (ver >= 0) {
       console.log('cdn hit:', url)
-      const res = await cdn.proxy(urlHash, ver)
+      const res = await cdn.proxyStatic(urlHash, ver)
       if (res) {
         setUrlCache(url, '', '', 0)
         return {res}

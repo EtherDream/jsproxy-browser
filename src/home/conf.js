@@ -60,6 +60,12 @@ jsproxy_config({
   // 本地测试时打开，否则访问的是线上的
   assets_cdn: 'assets/',
 
+  // 首页路径
+  index_path: 'index_v3.html',
+
+  // 支持 CORS 的站点列表（实验中...）
+  direct_host_list: 'cors_v1.txt',
+
   /**
    * 自定义注入页面的 HTML
    */

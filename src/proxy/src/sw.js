@@ -7,6 +7,7 @@ import * as network from './network.js'
 import * as MSG from './msg.js'
 import * as jsfilter from './jsfilter.js'
 import * as inject from './inject.js'
+import {Signal} from './signal.js'
 import {Database} from './database.js'
 
 
@@ -40,7 +41,7 @@ function sendMsg(target, cmd, val) {
 // 也可以用 clientId 关联，但兼容性不高
 let pageCounter = 0
 
-/** @type {Map<number, [Function, number]>} */
+/** @type {Map<number, [Signal, number]>} */
 const pageWaitMap = new Map()
 
 function genPageId() {
@@ -51,16 +52,16 @@ function genPageId() {
  * @param {number} pageId 
  */
 function pageWait(pageId) {
-  return new Promise(cb => {
-    // 设置最大等待时间
-    // 有些页面不会执行 JS（例如查看源文件），导致永久等待
-    const timer = setTimeout(_ => {
-      pageWaitMap.delete(pageId)
-      cb(false)
-    }, 2000)
+  const s = new Signal()
+  // 设置最大等待时间
+  // 有些页面不会执行 JS（例如查看源文件），导致永久等待
+  const timer = setTimeout(_ => {
+    pageWaitMap.delete(pageId)
+    s.notify(false)
+  }, 2000)
 
-    pageWaitMap.set(pageId, [cb, timer])
-  })
+  pageWaitMap.set(pageId, [s, timer])
+  return s.wait()
 }
 
 /**
@@ -73,10 +74,10 @@ function pageNotify(id, isDone) {
     console.warn('[jsproxy] unknown page id:', id)
     return
   }
-  const [cb, timer] = arr
+  const [s, timer] = arr
   if (isDone) {
     pageWaitMap.delete(id)
-    cb(true)
+    s.notify(true)
   } else {
     // 页面已开始初始化，关闭定时器
     clearTimeout(timer)
@@ -395,7 +396,12 @@ async function onFetch(e) {
 
   // 首页（例如 https://zjcqoo.github.io/）
   if (urlStr === path.ROOT || urlStr === path.HOME) {
-    const res = await fetch(mConf.assets_cdn + 'index_v3.html')
+    let indexPath = mConf.assets_cdn + mConf.index_path
+    if (!mConf.index_path) {
+      // 临时代码。防止配置文件未更新的情况下首页无法加载
+      indexPath = 'index_v3.html'
+    }
+    const res = await fetch(indexPath)
     return makeHtmlRes(res.body)
   }
 
@@ -514,14 +520,14 @@ async function loadConf() {
 }
 
 
-/** @type {Function[]} */
+/** @type {Signal[]} */
 let mConfInitQueue
 
 async function initConf() {
   if (mConfInitQueue) {
-    return new Promise(f => {
-      mConfInitQueue.push(f)
-    })
+    const s = new Signal()
+    mConfInitQueue.push(s)
+    return s.wait()
   }
   mConfInitQueue = []
 
@@ -543,7 +549,7 @@ async function initConf() {
   // 定期更新配置
   setInterval(loadConf, CONF_UPDATE_TIMER)
 
-  mConfInitQueue.forEach(f => f())
+  mConfInitQueue.forEach(s => s.notify())
   mConfInitQueue = null
 }
 

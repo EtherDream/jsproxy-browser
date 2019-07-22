@@ -8,8 +8,23 @@ let mCurVer = -1
 /** @type {Map<number, number>} */
 let mUrlHashVerMap = new Map()
 
+/** @type {Set<string>} */
+let mDirectHostSet = new Set()
 
-export async function setConf(conf) {
+
+async function loadDirectList(conf) {
+  const url = conf.assets_cdn + conf.direct_host_list
+  const res = await fetch(url)
+  const txt = await res.text()
+
+  for (const host of txt.split('\n')) {
+    if (host && host[0] !== '#') {
+      mDirectHostSet.add(host)
+    }
+  }
+}
+
+async function loadStaticList(conf) {
   const info = conf.static_boost
   if (!info || !info.enable) {
     return
@@ -37,6 +52,40 @@ export async function setConf(conf) {
 }
 
 
+export function setConf(conf) {
+  return Promise.all([
+    loadStaticList(conf),
+    loadDirectList(conf),
+  ])
+}
+
+/**
+ * @param {string} host 
+ */
+export function isDirectHost(host) {
+  return mDirectHostSet.has(host)
+}
+
+
+/**
+ * @param {string} url 
+ */
+export async function proxyDirect(url) {
+  try {
+    const res = await fetch(url, {
+      referrerPolicy: 'no-referrer',
+    })
+    const {status} = res
+    if (status === 200 || status === 206) {
+      return res
+    }
+    console.warn('direct status:', status, url)
+  } catch (err) {
+    console.warn('direct fail:', url)
+  }
+}
+
+
 /**
  * @param {number} urlHash 
  */
@@ -49,7 +98,7 @@ export function getFileVer(urlHash) {
  * @param {number} urlHash 
  * @param {number} urlVer 
  */
-async function proxyMain(urlHash, urlVer) {
+async function proxyStaticMain(urlHash, urlVer) {
   const hashHex = util.numToHex(urlHash, 8)
   const res = await fetch(CDN + urlVer + '/' + hashHex + '.txt')
   if (res.status !== 200) {
@@ -76,10 +125,10 @@ async function proxyMain(urlHash, urlVer) {
  * @param {number} urlHash 
  * @param {number} urlVer 
  */
-export async function proxy(urlHash, urlVer) {
+export async function proxyStatic(urlHash, urlVer) {
   // TODO: 使用多个 CDN
   try {
-    return await proxyMain(urlHash, urlVer)
+    return await proxyStaticMain(urlHash, urlVer)
   } catch(err) {
     console.warn('cdn fail:', err)
   }

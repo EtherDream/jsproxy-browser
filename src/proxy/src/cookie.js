@@ -384,7 +384,8 @@ export async function save() {
   for (const item of tmp) {
     if (item.isExpired) {
       await mDB.delete('cookie', item.id)
-    } else {
+    } else if (!isNaN(item.expires)) {
+      // 不保存 session cookie
       await mDB.put('cookie', item)
     }
   }
