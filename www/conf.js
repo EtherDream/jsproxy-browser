@@ -38,15 +38,7 @@ jsproxy_config({
       label: '',
       hidden: true,
       lines: {
-        // 收费版（高权重）
-        'node-cfworker.etherdream.com': 4,
-
-        // 免费版（低权重，分摊一些成本）
-        // 每个账号每天 10 万次免费请求，但有频率限制
-        'a.007.workers.dev': 1,
-        'a.hehe.workers.dev': 1,
-        'a.lulu.workers.dev': 1,
-        'shrill-unit-8594.jsproxy.workers.dev': 1,
+        'node-cfworker-2.etherdream.com': 1,
       }
     }
   },

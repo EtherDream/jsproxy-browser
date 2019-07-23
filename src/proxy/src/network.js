@@ -10,8 +10,6 @@ import {Database} from './database.js'
 const REFER_ORIGIN = location.origin + '/'
 const ENABLE_3RD_COOKIE = true
 
-const REQ_HDR_ALLOW = new Set('accept,accept-charset,accept-encoding,accept-language,accept-datetime,authorization,cache-control,content-length,content-type,date,if-match,if-modified-since,if-none-match,if-range,if-unmodified-since,max-forwards,pragma,range,te,upgrade,upgrade-insecure-requests,origin,user-agent,x-requested-with,chrome-proxy'.split(','))
-
 /** @type {Database} */
 let mDB
 
@@ -204,18 +202,47 @@ function getResInfo(res) {
       return
     }
 
-    // 删除 vary 字段的 --url
-    if (key === 'vary') {
-      if (val === '--url') {
-        return
-      }
-      val = val.replace('--url,', '')
-    }
-
     headers.set(key, val)
   })
 
   return {status, headers, cookieStrArr}
+}
+
+
+/**
+ * @param {string} key 
+ * @param {string} val 
+ */
+function isSimpleReqHdr(key, val) {
+  return (
+    // key === 'accept' ||
+    // key === 'accept-language' ||
+    // key === 'content-language' ||
+    key === 'content-type' && (
+      val === 'application/x-www-form-urlencoded' ||
+      val === 'multipart/form-data' ||
+      val === 'text/plain'
+    )
+  )
+}
+
+const R_UNSAFE =
+  // eslint-disable-next-line no-control-regex
+  /[\x00-\x08\x0a-\x1f\x22\x28\x29\x3a\x3c\x3e\x3f\x40\x5b\x5c\x5d\x7b\x7d\x7f]/g
+
+/**
+ * @param {string} str 
+ */
+function escapeHeader(str) {
+  // https://fetch.spec.whatwg.org/#cors-unsafe-request-header-byte
+  return str.replace(R_UNSAFE, v => {
+    const ch = v.charCodeAt(0)
+    let hex = ch.toString(16)
+    if (ch < 16) {
+      hex = '0' + hex
+    }
+    return '%' + hex
+  })
 }
 
 
@@ -225,28 +252,29 @@ function getResInfo(res) {
  * @param {URL} cliUrlObj 
  */
 function initReqHdr(req, urlObj, cliUrlObj) {
-  const sysHdr = new Headers({
-    '--ver': mConf.ver,
-    '--url': urlx.delHash(urlObj.href),
-    '--mode': req.mode,
-    '--type': req.destination || '',
-  })
-  const extHdr = {}
-  let hasExtHdr = false
+  const hdr = new Headers()
+  const sys = {
+    'ver': mConf.ver,
+    'mode': req.mode,
+    'type': req.destination || '',
+  }
+  if (mIsAcehOld) {
+    sys['aceh'] = '1'
+  }
 
+  const ext = {
+    'origin': '',
+  }
   req.headers.forEach((val, key) => {
-    if (REQ_HDR_ALLOW.has(key)) {
-      sysHdr.set(key, val)
+    if (isSimpleReqHdr(key, val)) {
+      hdr.set(key, val)
     } else {
-      extHdr[key] = val
-      hasExtHdr = true
+      ext[key] = val
     }
   })
 
-  if (sysHdr.has('origin')) {
-    sysHdr.set('--origin', cliUrlObj.origin)
-  } else {
-    sysHdr.set('--origin', '')
+  if (ext['origin']) {
+    ext['origin'] = cliUrlObj.origin
   }
 
   const referer = req.referrer
@@ -254,22 +282,25 @@ function initReqHdr(req, urlObj, cliUrlObj) {
     // TODO: CSS 引用图片的 referer 不是页面 URL，而是 CSS URL
     if (referer === REFER_ORIGIN) {
       // Referrer Policy: origin
-      sysHdr.set('--referer', cliUrlObj.origin + '/')
+      ext['referer'] = cliUrlObj.origin + '/'
     } else {
-      sysHdr.set('--referer', urlx.decUrlStrAbs(referer))
+      ext['referer'] = urlx.decUrlStrAbs(referer)
     }
   }
 
-  const cookie = getReqCookie(urlObj, cliUrlObj, req)
-  sysHdr.set('--cookie', cookie)
+  ext['cookie'] = getReqCookie(urlObj, cliUrlObj, req)
 
-  if (hasExtHdr) {
-    sysHdr.set('--ext', JSON.stringify(extHdr))
-  }
-  if (mIsAcehOld) {
-    sysHdr.set('--aceh', '1')
-  }
-  return sysHdr
+  const info = {sys, ext}
+  return {hdr, info}
+}
+
+/**
+ * @param {Headers} hdr 
+ * @param {Object} json 
+ */
+function updateReqHeaders(hdr, json) {
+  const s = JSON.stringify(json)
+  hdr.set('accept', escapeHeader(s))
 }
 
 
@@ -317,8 +348,8 @@ export async function launch(req, urlObj, cliUrlObj) {
   let host = ''
   let rawInfo = ''
 
-  const reqHdr = initReqHdr(req, urlObj, cliUrlObj)
-  reqOpt.headers = reqHdr
+  const {hdr, info} = initReqHdr(req, urlObj, cliUrlObj)
+  reqOpt.headers = hdr
 
   while (method === 'GET') {
     // 该资源是否加载过？
@@ -378,18 +409,21 @@ export async function launch(req, urlObj, cliUrlObj) {
     } else {
       host = route.getHost(urlHash, level)
     }
-    const proxyUrl = route.genUrl(host, 'http')
+    
+    const proxyUrl = route.genUrl(host, 'http') +
+      '/' + urlx.delHash(urlObj.href)
 
     // 即使未命中缓存，在请求“加速节点”时也能带上文件信息
     if (rawInfo) {
-      reqHdr.set('--raw-info', rawInfo)
+      info.sys['raw-info'] = rawInfo
     } else {
-      reqHdr.delete('--raw-info')
+      delete info.sys['raw-info']
     }
 
     res = null
     try {
-      reqHdr.set('--level', level + '')
+      info.sys['level'] = level
+      updateReqHeaders(hdr, info)
       res = await fetch(proxyUrl, reqOpt)
     } catch (err) {
       console.warn('fetch fail:', proxyUrl)
@@ -402,7 +436,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     // 检测浏览器是否支持 aceh: *
     if (mIsAcehOld && resHdr.has('--t')) {
       mIsAcehOld = false
-      reqHdr.delete('--aceh')
+      delete info.sys['aceh']
     }
 
     // 是否切换节点

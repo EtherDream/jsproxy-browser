@@ -399,7 +399,7 @@ async function onFetch(e) {
     let indexPath = mConf.assets_cdn + mConf.index_path
     if (!mConf.index_path) {
       // 临时代码。防止配置文件未更新的情况下首页无法加载
-      indexPath = 'index_v3.html'
+      indexPath = mConf.assets_cdn + 'index_v3.html'
     }
     const res = await fetch(indexPath)
     return makeHtmlRes(res.body)

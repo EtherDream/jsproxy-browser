@@ -69,7 +69,10 @@ gh.bdstatic.com
 3gimg.qq.com
 combo.b.qq.com
 
-# taotiao
+# bilibili
+upos-hz-mirrorakam.akamaized.net
+
+# toutiao
 images.taboola.com
 images.taboola.com.cn
 images-dup.taboola.com
