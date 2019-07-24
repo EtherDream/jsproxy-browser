@@ -209,40 +209,31 @@ function getResInfo(res) {
 }
 
 
+// https://fetch.spec.whatwg.org/#cors-unsafe-request-header-byte
+const R_UNSAFE_REQ_HDR_CHAR =
+  // eslint-disable-next-line no-control-regex
+  /[\x00-\x08\x0a-\x1f\x22\x28\x29\x3a\x3c\x3e\x3f\x40\x5b\x5c\x5d\x7b\x7d\x7f]/
+
 /**
  * @param {string} key 
  * @param {string} val 
  */
 function isSimpleReqHdr(key, val) {
-  return (
-    // key === 'accept' ||
-    // key === 'accept-language' ||
-    // key === 'content-language' ||
-    key === 'content-type' && (
+  if (key === 'content-type') {
+    return (
       val === 'application/x-www-form-urlencoded' ||
       val === 'multipart/form-data' ||
       val === 'text/plain'
     )
-  )
-}
-
-const R_UNSAFE =
-  // eslint-disable-next-line no-control-regex
-  /[\x00-\x08\x0a-\x1f\x22\x28\x29\x3a\x3c\x3e\x3f\x40\x5b\x5c\x5d\x7b\x7d\x7f]/g
-
-/**
- * @param {string} str 
- */
-function escapeHeader(str) {
-  // https://fetch.spec.whatwg.org/#cors-unsafe-request-header-byte
-  return str.replace(R_UNSAFE, v => {
-    const ch = v.charCodeAt(0)
-    let hex = ch.toString(16)
-    if (ch < 16) {
-      hex = '0' + hex
-    }
-    return '%' + hex
-  })
+  }
+  if (key === 'accept' ||
+      key === 'accept-language' ||
+      key === 'content-language'
+  ) {
+    // 标准是总和小于 1024，这里保守一些
+    return val.length < 256 &&
+      !R_UNSAFE_REQ_HDR_CHAR.test(val)
+  }
 }
 
 
@@ -252,29 +243,30 @@ function escapeHeader(str) {
  * @param {URL} cliUrlObj 
  */
 function initReqHdr(req, urlObj, cliUrlObj) {
-  const hdr = new Headers()
-  const sys = {
-    'ver': mConf.ver,
-    'mode': req.mode,
-    'type': req.destination || '',
-  }
-  if (mIsAcehOld) {
-    sys['aceh'] = '1'
-  }
-
-  const ext = {
+  const reqHdr = new Headers()
+  const reqMap = {
+    '--ver': mConf.ver,
+    '--mode': req.mode,
+    '--type': req.destination || '',
     'origin': '',
   }
+  if (mIsAcehOld) {
+    reqMap['--aceh'] = '1'
+  }
+
   req.headers.forEach((val, key) => {
+    if (key === 'user-agent') {
+      return
+    }
     if (isSimpleReqHdr(key, val)) {
-      hdr.set(key, val)
+      reqHdr.set(key, val)
     } else {
-      ext[key] = val
+      reqMap[key] = val
     }
   })
 
-  if (ext['origin']) {
-    ext['origin'] = cliUrlObj.origin
+  if (reqMap['origin']) {
+    reqMap['origin'] = cliUrlObj.origin
   }
 
   const referer = req.referrer
@@ -282,25 +274,23 @@ function initReqHdr(req, urlObj, cliUrlObj) {
     // TODO: CSS 引用图片的 referer 不是页面 URL，而是 CSS URL
     if (referer === REFER_ORIGIN) {
       // Referrer Policy: origin
-      ext['referer'] = cliUrlObj.origin + '/'
+      reqMap['referer'] = cliUrlObj.origin + '/'
     } else {
-      ext['referer'] = urlx.decUrlStrAbs(referer)
+      reqMap['referer'] = urlx.decUrlStrAbs(referer)
     }
   }
 
-  ext['cookie'] = getReqCookie(urlObj, cliUrlObj, req)
+  reqMap['cookie'] = getReqCookie(urlObj, cliUrlObj, req)
 
-  const info = {sys, ext}
-  return {hdr, info}
+  return {reqHdr, reqMap}
 }
 
 /**
- * @param {Headers} hdr 
- * @param {Object} json 
+ * @param {RequestInit} reqOpt 
+ * @param {Object<string, string>} info 
  */
-function updateReqHeaders(hdr, json) {
-  const s = JSON.stringify(json)
-  hdr.set('accept', escapeHeader(s))
+function updateReqHeaders(reqOpt, info) {
+  reqOpt.referrer = '/?' + new URLSearchParams(info)
 }
 
 
@@ -317,7 +307,6 @@ export async function launch(req, urlObj, cliUrlObj) {
   /** @type {RequestInit} */
   const reqOpt = {
     mode: 'cors',
-    referrerPolicy: 'no-referrer',
     method,
   }
 
@@ -348,8 +337,8 @@ export async function launch(req, urlObj, cliUrlObj) {
   let host = ''
   let rawInfo = ''
 
-  const {hdr, info} = initReqHdr(req, urlObj, cliUrlObj)
-  reqOpt.headers = hdr
+  const {reqHdr, reqMap} = initReqHdr(req, urlObj, cliUrlObj)
+  reqOpt.headers = reqHdr
 
   while (method === 'GET') {
     // 该资源是否加载过？
@@ -410,20 +399,26 @@ export async function launch(req, urlObj, cliUrlObj) {
       host = route.getHost(urlHash, level)
     }
     
-    const proxyUrl = route.genUrl(host, 'http') +
-      '/' + urlx.delHash(urlObj.href)
+    const rawUrl = urlx.delHash(urlObj.href)
+    let proxyUrl = route.genUrl(host, 'http') + '/'
+
+    if (method === 'GET') {
+      proxyUrl += rawUrl
+    } else {
+      reqMap['--url'] = rawUrl
+    }
 
     // 即使未命中缓存，在请求“加速节点”时也能带上文件信息
     if (rawInfo) {
-      info.sys['raw-info'] = rawInfo
+      reqMap['--raw-info'] = rawInfo
     } else {
-      delete info.sys['raw-info']
+      delete reqMap['--raw-info']
     }
 
     res = null
     try {
-      info.sys['level'] = level
-      updateReqHeaders(hdr, info)
+      reqMap['--level'] = level
+      updateReqHeaders(reqOpt, reqMap)
       res = await fetch(proxyUrl, reqOpt)
     } catch (err) {
       console.warn('fetch fail:', proxyUrl)
@@ -436,7 +431,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     // 检测浏览器是否支持 aceh: *
     if (mIsAcehOld && resHdr.has('--t')) {
       mIsAcehOld = false
-      delete info.sys['aceh']
+      delete reqMap['--aceh']
     }
 
     // 是否切换节点
