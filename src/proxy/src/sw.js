@@ -89,7 +89,7 @@ function makeHtmlRes(body, status = 200) {
   return new Response(body, {
     status,
     headers: {
-      'content-type': 'text/html',
+      'content-type': 'text/html; charset=utf-8',
     }
   })
 }
@@ -166,7 +166,7 @@ async function sendMsgToPages(cmd, msg, srcId) {
 
 
 /** @type Map<string, string> */
-const idUrlMap = new Map()
+const mIdUrlMap = new Map()
 
 /**
  * @param {string} id 
@@ -177,31 +177,35 @@ async function getUrlByClientId(id) {
     return
   }
   const urlStr = urlx.decUrlStrAbs(client.url)
-  idUrlMap.set(id, urlStr)
+  mIdUrlMap.set(id, urlStr)
   return urlStr
 }
 
 
-const ERR_MSG_MAP = {
-  'ORIGIN_NOT_ALLOWED': '当前域名不在服务器外链白名单',
-  'CIRCULAR_DEPENDENCY': '当前请求出现循环代理'
-}
-
 /**
- * 
  * @param {string} jsonStr 
  * @param {number} status 
  * @param {URL} urlObj 
  */
 function parseGatewayError(jsonStr, status, urlObj) {
   let ret = ''
-  const jsonObj = JSON.parse(jsonStr)
-  const msg = jsonObj['msg']
-  const addr = jsonObj['addr']
+  const {
+    msg, addr, url
+  } = JSON.parse(jsonStr)
 
   switch (status) {
   case 204:
-    ret = ERR_MSG_MAP[msg] || ''
+    switch (msg) {
+    case 'ORIGIN_NOT_ALLOWED':
+      ret = '当前域名不在服务器外链白名单'
+      break
+    case 'CIRCULAR_DEPENDENCY':
+      ret = '当前请求出现循环代理'
+      break
+    case 'SITE_MOVE':
+      ret = `当前站点移动到: <a href="${url}">${url}</a>`
+      break
+    }
     break
   case 500:
     ret = '代理服务器内部错误'
@@ -346,7 +350,7 @@ async function proxy(e, urlObj) {
   const id = e.clientId
   let cliUrlStr
   if (id) {
-    cliUrlStr = idUrlMap.get(id) || await getUrlByClientId(id)
+    cliUrlStr = mIdUrlMap.get(id) || await getUrlByClientId(id)
   }
   if (!cliUrlStr) {
     cliUrlStr = urlObj.href
