@@ -59,7 +59,6 @@ export function encUrlObj(urlObj) {
   if (isInternalUrl(fullUrl)) {
     return fullUrl
   }
-  console.log(urlObj.host, proxyForHost(urlObj.host));
   if (env.isPageEnv() && !proxyForHost(urlObj.host)) {
     return fullUrl;
   }
