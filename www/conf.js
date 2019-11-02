@@ -66,6 +66,7 @@ jsproxy_config({
     'medium.com': 1,
     'stackoverflow.com': 1,
     'stackexchange.com': 1,
+    'github.com': 1,
   },
 
   /**
