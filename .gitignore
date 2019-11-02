@@ -1,5 +1,3 @@
 .tags
 ._*
 node_modules
-src/home/assets/bundle.debug.js
-www/assets/bundle.*.js
