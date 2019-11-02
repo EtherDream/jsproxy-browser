@@ -50,6 +50,23 @@ jsproxy_config({
   },
 
   /**
+   * 配置按域名是否代理
+   * 不在对象中的域名不走代理
+   */
+  proxy_domains: {
+    'cn': 0,
+    'google.com': 1,
+    'youtube.com': 1,
+    'quora.com': 1,
+    'reddit.com': 1,
+    'wikipedia.org': 1,
+    'blogger.com': 1,
+    'medium.com': 1,
+    'stackoverflow.com': 1,
+    'stackexchange.com': 1,
+  },
+
+  /**
    * 默认节点
    */
   node_default: 'demo-hk',

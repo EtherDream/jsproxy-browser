@@ -8,6 +8,7 @@ const PREFIX = path.PREFIX
 const PREFIX_LEN = PREFIX.length
 const ROOT_LEN = path.ROOT.length
 
+
 /**
  * @param {string} url 
  */
@@ -38,6 +39,17 @@ export function newUrl(url, baseUrl) {
   }
 }
 
+export function proxyForHost(host) {
+  const proxy_domains = __CONF__.proxy_domains;
+  let nh = host, lastDotIndex, tmp;
+  do {
+    lastDotIndex = nh.lastIndexOf('.');
+    tmp = host.substr(lastDotIndex + 1);
+    if (tmp in proxy_domains) return proxy_domains[tmp] ? true : false;
+    nh = host.substr(0, lastDotIndex);
+  } while(lastDotIndex > -1)
+  return false;
+}
 
 /**
  * @param {URL | Location} urlObj 
@@ -47,7 +59,11 @@ export function encUrlObj(urlObj) {
   if (isInternalUrl(fullUrl)) {
     return fullUrl
   }
-  return PREFIX + fullUrl
+  console.log(urlObj.host, proxyForHost(urlObj.host));
+  if (env.isPageEnv() && !proxyForHost(urlObj.host)) {
+    return fullUrl;
+  }
+  return PREFIX + fullUrl;
 }
 
 const IS_SW = env.isSwEnv()

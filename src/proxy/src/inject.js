@@ -50,6 +50,8 @@ export function getHtmlCode(urlObj, pageId) {
 <link rel="icon" href="${icoUrl}" type="image/x-icon">
 <meta http-equiv="content-security-policy" content="frame-src ${CSP}; object-src ${CSP}">
 <base href="${urlObj.href}">
+<script data-id="${pageId}">jsproxy_config=x=>{__CONF__=x;}</script>
+<script data-id="${pageId}" src="${path.ROOT}conf.js"></script>
 <script data-id="${pageId}" src="${path.HELPER}"></script>
 ${custom}
 <!-- PADDING ${PADDING} -->

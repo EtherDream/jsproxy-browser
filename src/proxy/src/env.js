@@ -8,6 +8,10 @@ export function setEnvType(v) {
   mEnvType = v
 }
 
+export function isPageEnv() {
+  return mEnvType === ENV_PAGE
+}
+
 export function isSwEnv() {
   return mEnvType === ENV_SW
 }
