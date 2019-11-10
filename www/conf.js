@@ -67,6 +67,7 @@ jsproxy_config({
     'stackoverflow.com': 1,
     'stackexchange.com': 1,
     'github.com': 1,
+    'w3schools.com': 1,
   },
 
   /**
