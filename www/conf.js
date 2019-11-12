@@ -68,6 +68,7 @@ jsproxy_config({
     'stackexchange.com': 1,
     'github.com': 1,
     'w3schools.com': 1,
+    'v2ray.com': 1,
   },
 
   /**
