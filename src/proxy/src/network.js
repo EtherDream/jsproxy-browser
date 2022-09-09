@@ -9,6 +9,7 @@ import {Database} from './database.js'
 
 const REFER_ORIGIN = location.origin + '/'
 const ENABLE_3RD_COOKIE = true
+const hasBodyMethods = ['POST','PUT','DELETE','PATCH']
 
 /** @type {Database} */
 let mDB
@@ -38,7 +39,7 @@ export async function setDB(db) {
 
 
 /**
- * @param {string} url 
+ * @param {string} url
  */
 function getUrlCache(url) {
   return mDB.get('url-cache', url)
@@ -46,10 +47,10 @@ function getUrlCache(url) {
 
 
 /**
- * @param {string} url 
- * @param {string} host 
- * @param {string} info 
- * @param {number} expires 
+ * @param {string} url
+ * @param {string} host
+ * @param {string} info
+ * @param {number} expires
  */
 async function setUrlCache(url, host, info, expires) {
   await mDB.put('url-cache', {url, host, info, expires})
@@ -57,7 +58,7 @@ async function setUrlCache(url, host, info, expires) {
 
 
 /**
- * @param {string} url 
+ * @param {string} url
  */
 async function delUrlCache(url) {
   await mDB.delete('url-cache', url)
@@ -65,9 +66,9 @@ async function delUrlCache(url) {
 
 
 /**
- * @param {URL} targetUrlObj 
- * @param {URL} clientUrlObj 
- * @param {Request} req 
+ * @param {URL} targetUrlObj
+ * @param {URL} clientUrlObj
+ * @param {Request} req
  */
 function getReqCookie(targetUrlObj, clientUrlObj, req) {
   const cred = req.credentials
@@ -87,7 +88,7 @@ function getReqCookie(targetUrlObj, clientUrlObj, req) {
 
 
 /**
- * @param {Headers} header 
+ * @param {Headers} header
  */
 function parseResCache(header) {
   const cacheStr = header.get('cache-control')
@@ -115,8 +116,8 @@ function parseResCache(header) {
 
 
 /**
- * @param {string[]} cookieStrArr 
- * @param {URL} urlObj 
+ * @param {string[]} cookieStrArr
+ * @param {URL} urlObj
  * @param {URL} cliUrlObj
  */
 function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
@@ -146,7 +147,7 @@ function procResCookie(cookieStrArr, urlObj, cliUrlObj) {
 
 
 /**
- * @param {Response} res 
+ * @param {Response} res
  */
 function getResInfo(res) {
   const rawHeaders = res.headers
@@ -215,8 +216,8 @@ const R_UNSAFE_REQ_HDR_CHAR =
   /[\x00-\x08\x0a-\x1f\x22\x28\x29\x3a\x3c\x3e\x3f\x40\x5b\x5c\x5d\x7b\x7d\x7f]/
 
 /**
- * @param {string} key 
- * @param {string} val 
+ * @param {string} key
+ * @param {string} val
  */
 function isSimpleReqHdr(key, val) {
   if (key === 'content-type') {
@@ -238,9 +239,9 @@ function isSimpleReqHdr(key, val) {
 
 
 /**
- * @param {Request} req 
- * @param {URL} urlObj 
- * @param {URL} cliUrlObj 
+ * @param {Request} req
+ * @param {URL} urlObj
+ * @param {URL} cliUrlObj
  */
 function initReqHdr(req, urlObj, cliUrlObj) {
   const reqHdr = new Headers()
@@ -286,8 +287,8 @@ function initReqHdr(req, urlObj, cliUrlObj) {
 }
 
 /**
- * @param {RequestInit} reqOpt 
- * @param {Object<string, string>} info 
+ * @param {RequestInit} reqOpt
+ * @param {Object<string, string>} info
  */
 function updateReqHeaders(reqOpt, info) {
   reqOpt.referrer = '/?' + new URLSearchParams(info)
@@ -297,9 +298,9 @@ function updateReqHeaders(reqOpt, info) {
 const MAX_RETRY = 5
 
 /**
- * @param {Request} req 
- * @param {URL} urlObj 
- * @param {URL} cliUrlObj 
+ * @param {Request} req
+ * @param {URL} urlObj
+ * @param {URL} cliUrlObj
  */
 export async function launch(req, urlObj, cliUrlObj) {
   const {method} = req
@@ -310,7 +311,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     method,
   }
 
-  if (method === 'POST' && !req.bodyUsed) {
+  if (hasBodyMethods.indexOf(method) >= 0  && !req.bodyUsed) {
     if (req.body) {
       reqOpt.body = req.body
     } else {
@@ -398,7 +399,7 @@ export async function launch(req, urlObj, cliUrlObj) {
     } else {
       host = route.getHost(urlHash, level)
     }
-    
+
     const rawUrl = urlx.delHash(urlObj.href)
     let proxyUrl = route.genUrl(host, 'http') + '/' + rawUrl
 
@@ -408,7 +409,9 @@ export async function launch(req, urlObj, cliUrlObj) {
     } else {
       delete reqMap['--raw-info']
     }
-
+    if (reqOpt['body'] instanceof ReadableStream){
+      reqOpt['duplex'] = 'half'
+    }
     res = null
     try {
       reqMap['--level'] = level
